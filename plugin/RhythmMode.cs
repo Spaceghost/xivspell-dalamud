@@ -124,6 +124,9 @@ public sealed partial class Plugin
     }
     private void SuspendRhythm()
     {
+        if (config.RhythmEnabled && rhythm.Active) {
+            weave.EnterControl();keyboard.Capture=false;
+        }
         rhythm.Pause(RhythmNow); rhythmAvailable = false; rhythmPadReleased = true;rhythmStartPending=false;
     }
     private void UpdateRhythm(bool eligible)
