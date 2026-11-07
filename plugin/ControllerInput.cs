@@ -10,17 +10,11 @@ public sealed partial class Plugin
     private void ReadController(bool eligible)
     {
         if (pad == null) return;
-        eligible &= !gamepad.EnableGamepadNav;
+        eligible &= !gamepad.EnableGamepadNav && !config.RhythmEnabled;
+        // Free spelling is keyboard-only. Release all existing pad leases here.
         var frame = pad.Read(eligible, composer.Active || RhythmPadOwned);
         if (!eligible) { composer.Active = false; return; }
         if (pad.TakeOpen()) {
-            if (config.RhythmEnabled) {
-                var wasController=config.RhythmController;
-                config.RhythmController=true;pi.SavePluginConfig(config);
-                if (rhythm.Active && wasController) { SuspendRhythm(); InterruptWeave("Rhythm paused", true); }
-                else { rhythm.Pause(RhythmNow);BeginRhythm(); }
-                padSequence = 0; return;
-            }
             composer.Active = !composer.Active; padSequence = 0;
             if (composer.Active) { InterruptWeave("Controller composing", true); barVisible = true; }
         }
@@ -29,7 +23,6 @@ public sealed partial class Plugin
         if (f.Sequence <= padSequence) return;
         padSequence = f.Sequence;
         var pressed = f.Pressed;
-        if (RhythmController(pressed, f.InputTime)) return;
         if ((pressed & 128) != 0) { CardInput("cancel", "voice"); composer.Active = false; InterruptWeave("Stopped", true); return; }
         if ((pressed & 32768) != 0) { StartPlayback(); return; }
         if ((pressed & 16384) != 0) { StartPlayback(true); return; }

@@ -1,3 +1,11 @@
+0.1.0.4
+- Free spelling with a native reverse pulse: type any spell, with no selection.
+- Wrong, missed, or off-beat characters restart the unfinished spell from its first letter.
+- Continue spelling after queueing; Enter disambiguates exact shorter spell names.
+- Replace lanes with a contracting approach ring, fixed receptor, timing glow, and readable word/queue controls.
+- Backspace restarts a word or removes the last rune; hold clears the queue.
+- Defer rhythm controller input and release pad leases; retain normal controller mode.
+
 2026-11-07 / native two-hand highway and future song charts
 
 Spellstrings now uses the same native overlay nodes as the existing spell HUD.

@@ -58,10 +58,12 @@ public sealed class RhythmClock
     public double NextBeat(double now) => anchor + (Math.Floor((now - anchor) / Period) + 1) * Period;
 }
 
+// A shared timing stream: the player chooses the spell by typing it.
+// Empty beats are optional; only an unfinished word can be broken by a miss.
 public sealed class RhythmRound
 {
     public sealed record Spell(string Id, string Phrase, string Name);
-    public sealed record Note(char Letter, int Lane, char[] Choices, double Due, int LetterIndex);
+    public sealed record Note(double Due);
     public enum Phase { Idle, Playing, Paused, Ready }
     public enum Grade { None, Perfect, Great, Good, Early, Wrong, Miss }
     public Phase State { get; private set; }
@@ -70,149 +72,126 @@ public sealed class RhythmRound
     public int Cursor { get; private set; }
     public int Score { get; private set; }
     public int Combo { get; private set; }
-    public int BestCombo { get; private set; }
     public int Hits { get; private set; }
     public int Misses { get; private set; }
-    public int Perfects { get; private set; }
-    public int Stars => Hits == 0 ? 0 : Accuracy >= .98 ? 5 : Accuracy >= .9 ? 4 : Accuracy >= .75 ? 3 : Accuracy >= .55 ? 2 : 1;
-    public double Accuracy => Hits + Misses == 0 ? 0 : (double)Hits / (Hits + Misses);
-    public string Prefix => Target == null ? "" : new string(Notes.Take(Cursor).Select(n => n.Letter).ToArray());
+    public string Prefix { get; private set; } = "";
+    public string LastSpell { get; private set; } = "";
     public Grade LastGrade { get; private set; }
     public double LastFeedback { get; private set; } = double.NegativeInfinity;
-    public double LastErrorMs { get; private set; }
+    public string Feedback { get; private set; } = "";
     public double PausedAt { get; private set; }
     public double LatencyMs { get; set; }
-    public double HitWindow { get; set; } = .16;
+    public double HitWindow { get; set; } = .18;
     public bool Active => State == Phase.Playing;
-    public bool Completed => State == Phase.Ready && Hits == Notes.Length && Notes.Length > 0;
-    private double notePeriod = .5, lastInput = double.NegativeInfinity;
+    public bool Completed => State == Phase.Ready && Target != null;
+    public IEnumerable<Spell> Matches => deck.Where(s => s.Phrase.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase));
+    public string NextLetters => string.Join("  ", Matches.Where(s => s.Phrase.Length > Prefix.Length)
+        .Select(s => s.Phrase[Prefix.Length]).Distinct().Order().Select(c => c == ' ' ? "SPACE" : char.ToUpperInvariant(c).ToString()));
+    private Spell[] deck = [];
+    private double period = .5, lastInput = double.NegativeInfinity;
 
-    public bool Start(Spell spell, IReadOnlyList<Spell> deck, double firstBeat, double period, IReadOnlyList<double>? musicTimes = null)
+    public bool Start(IReadOnlyList<Spell> spells, double firstBeat, double beatPeriod, IReadOnlyList<double>? times = null)
     {
-        if (string.IsNullOrWhiteSpace(spell.Id) || string.IsNullOrWhiteSpace(spell.Phrase) ||
-            spell.Phrase.Length > 64 || spell.Phrase.Any(char.IsControl) ||
-            !double.IsFinite(firstBeat) || !double.IsFinite(period) || period is < .12 or > 1.5) return false;
-        Target = spell with { Phrase = spell.Phrase.ToLowerInvariant() };
-        var notes = new List<Note>();
-        var prefix = "";
-        foreach (var ch in Target.Phrase) {
-            var choices = Choices(prefix, ch, deck);
-            notes.Add(new(ch, Array.IndexOf(choices, ch), choices, firstBeat + notes.Count * period, notes.Count));
-            prefix += ch;
-        }
-        Notes = notes.ToArray(); notePeriod = period; Cursor = Score = Combo = BestCombo = Hits = Misses = Perfects = 0;
-        if (musicTimes != null && musicTimes.Count >= Notes.Length && musicTimes.Take(Notes.Length).All(double.IsFinite) &&
-            musicTimes.Take(Notes.Length).Zip(musicTimes.Skip(1), (a,b) => b-a).All(gap => gap >= .20))
-            for (var i = 0; i < Notes.Length; i++) Notes[i] = Notes[i] with { Due = musicTimes[i] };
-        LastGrade = Grade.None; LastFeedback = lastInput = double.NegativeInfinity;
-        State = Phase.Playing;
-        return true;
+        if (!double.IsFinite(firstBeat) || !double.IsFinite(beatPeriod) || beatPeriod is < .12 or > 1.5) return false;
+        deck = spells.Where(s => !string.IsNullOrWhiteSpace(s.Id) && !string.IsNullOrWhiteSpace(s.Phrase)
+            && s.Phrase.Length <= 64 && !s.Phrase.Any(char.IsControl))
+            .Select(s => s with { Phrase = s.Phrase.ToLowerInvariant() }).ToArray();
+        if (deck.Length == 0) return false;
+        period = beatPeriod; Prefix = LastSpell = ""; Target = null;
+        Score = Combo = Hits = Misses = 0; lastInput = LastFeedback = double.NegativeInfinity;
+        LastGrade = Grade.None; Feedback = "Type any spell on the pulses";
+        SetTimeline(firstBeat, times); State = Phase.Playing; return true;
     }
-    public static char[] Choices(string prefix, char required, IReadOnlyList<Spell> deck)
+    private static bool ValidTimes(IReadOnlyList<double>? times) => times is { Count: >= 2 }
+        && times.All(double.IsFinite) && times.Zip(times.Skip(1), (a,b) => b-a).All(g => g >= .2);
+    private void SetTimeline(double firstBeat, IReadOnlyList<double>? times)
     {
-        var possible = deck.Select(s => s.Phrase.ToLowerInvariant())
-            .Where(p => p.Length > prefix.Length && p.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            .Select(p => p[prefix.Length]).Where(c => !char.IsControl(c)).Distinct().Order().ToList();
-        possible.Remove(required);
-        // Stable per-prefix permutation; fills empty lanes with distinct decoys.
-        uint seed = 2166136261;
-        foreach (var c in prefix) seed = (seed ^ c) * 16777619;
-        seed = (seed ^ required) * 16777619;
-        var result = new char[8]; var lane = (int)(seed % 8); result[lane] = required;
-        var used = new HashSet<char> { required };
-        for (var i = 0; i < result.Length; i++) {
-            if (i == lane) continue;
-            var next = possible.FirstOrDefault(c => !used.Contains(c));
-            if (next == default) {
-                for (var j = 0; j < 26; j++) {
-                    var candidate = (char)('a' + (seed + (uint)j * 7) % 26);
-                    if (!used.Contains(candidate)) { next = candidate; break; }
-                }
-            }
-            result[i] = next; used.Add(next);
-        }
-        return result;
+        Notes = ValidTimes(times) ? times!.Select(t => new Note(t)).ToArray()
+            : Enumerable.Range(0,64).Select(i => new Note(firstBeat+i*period)).ToArray();
+        Cursor = 0;
     }
+    // Append instead of moving visible pulses when Piano refreshes its map.
+    public void Extend(IReadOnlyList<double>? times = null)
+    {
+        if (Notes.Length == 0) return;
+        var last = Notes[^1].Due;
+        var future = ValidTimes(times) ? times!.Where(t => t-last >= .2).Take(64).Select(t => new Note(t)).ToArray()
+            : Enumerable.Range(1,32).Select(i => new Note(last+i*period)).ToArray();
+        Notes = Notes.Skip(Cursor).Concat(future).Take(128).ToArray(); Cursor = 0;
+    }
+    private void ResetWord(Grade grade, double at, string message, bool penalty)
+    {
+        Prefix = ""; Target = null; Combo = 0;
+        if (penalty) Misses++;
+        LastGrade = grade; LastFeedback = at; Feedback = message;
+    }
+    public void Restart(double at) => ResetWord(Grade.None, at, "Word cleared · start any spell", false);
+    public void Notice(string message, double at) { Feedback = message; LastFeedback = at; LastGrade = Grade.None; }
     public void Tick(double now)
     {
         if (!Active || !double.IsFinite(now)) return;
-        // A miss retains its letter and schedules it on a later beat. It cannot
-        // silently turn an incomplete spell into a castable rune.
-        if (Cursor < Notes.Length && now - Notes[Cursor].Due > HitWindow) {
-            LastGrade = Grade.Miss; LastFeedback = now; Combo = 0; Misses++;
-            Shift(Math.Max(notePeriod, Math.Ceiling((now - Notes[Cursor].Due + notePeriod) / notePeriod) * notePeriod));
-        }
+        // Compare the same calibrated clock used for event timestamps.
+        var calibrated = now - Math.Clamp(double.IsFinite(LatencyMs) ? LatencyMs : 0,-250,250)/1000;
+        if (Cursor >= Notes.Length || calibrated - Notes[Cursor].Due <= HitWindow) return;
+        if (Prefix.Length > 0) ResetWord(Grade.Miss, now, "MISSED · restart from the first letter", true);
+        while (Cursor < Notes.Length && calibrated - Notes[Cursor].Due > HitWindow) Cursor++;
     }
-    public Grade PressLane(int lane, double at) =>
-        lane is >= 0 and < 8 && Cursor < Notes.Length ? Press(Notes[Cursor].Choices[lane], at) : Grade.None;
     public Grade Press(char letter, double at)
     {
-        if (!Active || Cursor >= Notes.Length || !double.IsFinite(at) || at < lastInput) return Grade.None;
-        lastInput = at;
-        var error = at - Math.Clamp(double.IsFinite(LatencyMs) ? LatencyMs : 0, -250, 250) / 1000 - Notes[Cursor].Due;
-        LastErrorMs = error * 1000;
+        if (!Active || !double.IsFinite(at) || at < lastInput) return Grade.None;
+        lastInput = at; var missesBefore=Misses; Tick(at);
+        if (Misses>missesBefore) return LastGrade;
+        if (letter == ' ' && Prefix.Length == 0) return Grade.None;
+        var error = Cursor < Notes.Length ? at - Math.Clamp(double.IsFinite(LatencyMs) ? LatencyMs : 0,-250,250)/1000 - Notes[Cursor].Due : double.PositiveInfinity;
         if (Math.Abs(error) > HitWindow) {
-            if (at - LastFeedback >= .06) { LastGrade = Grade.Early; LastFeedback = at; }
-            return Grade.Early;
+            ResetWord(Grade.Early, at, "OFF BEAT · restart from the first letter", Prefix.Length > 0); return LastGrade;
         }
-        LastFeedback = at;
-        if (char.ToLowerInvariant(letter) != Notes[Cursor].Letter) {
-            Combo = 0; Misses++; LastGrade = Grade.Wrong; return LastGrade;
+        var next = Prefix + char.ToLowerInvariant(letter);
+        if (!deck.Any(s => s.Phrase.StartsWith(next, StringComparison.OrdinalIgnoreCase))) {
+            Cursor++; ResetWord(Grade.Wrong, at, "WRONG LETTER · restart from the first letter", true); return LastGrade;
         }
-        LastGrade = Math.Abs(error) <= .045 ? Grade.Perfect : Math.Abs(error) <= .09 ? Grade.Great : Grade.Good;
-        if (LastGrade == Grade.Perfect) Perfects++;
-        Hits++; Combo++; BestCombo = Math.Max(BestCombo, Combo);
-        Score += (LastGrade == Grade.Perfect ? 100 : LastGrade == Grade.Great ? 70 : 40) * Math.Min(4, 1 + Combo / 8);
-        if (++Cursor == Notes.Length) State = Phase.Ready;
+        Prefix = next; Cursor++; Hits++; Combo++;
+        LastGrade = Math.Abs(error) <= .045 ? Grade.Perfect : Math.Abs(error) <= .1 ? Grade.Great : Grade.Good;
+        Score += LastGrade == Grade.Perfect ? 100 : LastGrade == Grade.Great ? 70 : 40;
+        LastFeedback = at; Feedback = LastGrade.ToString().ToUpperInvariant();
+        var exact = deck.FirstOrDefault(s => s.Phrase == Prefix);
+        if (exact != null && !deck.Any(s => s.Phrase.Length > Prefix.Length && s.Phrase.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase)))
+            Complete(exact);
         return LastGrade;
     }
-    public void Pause(double now)
+    private void Complete(Spell spell) { Target = spell; State = Phase.Ready; }
+    public bool Commit(double at)
     {
-        if (!Active) return;
-        State = Phase.Paused; PausedAt = now;
+        if (!Active) return false;
+        var exact = deck.FirstOrDefault(s => s.Phrase == Prefix);
+        if (exact == null) { Notice("Finish spelling before Enter", at); return false; }
+        Complete(exact); return true;
     }
-    public void Resume(double firstBeat)
+    public Spell? TakeCompleted(double now)
     {
-        if (State != Phase.Paused || Cursor >= Notes.Length || !double.IsFinite(firstBeat)) return;
-        Shift(firstBeat - Notes[Cursor].Due); State = Phase.Playing;
+        if (!Completed) return null;
+        var spell = Target!; LastSpell = spell.Name; Prefix = ""; Target = null; State = Phase.Playing;
+        Notice("QUEUED  " + spell.Name.ToUpperInvariant(), now); return spell;
     }
-    public void Resume(IReadOnlyList<double> times)
+    public void Pause(double now) { if (!Active) return; State = Phase.Paused; PausedAt = now; }
+    public void Resume(double firstBeat, IReadOnlyList<double>? times = null)
     {
-        if (State != Phase.Paused || times.Count < Notes.Length-Cursor || times.Any(t => !double.IsFinite(t)) ||
-            times.Zip(times.Skip(1),(a,b) => b-a).Any(gap => gap < .2)) return;
-        for (var i = Cursor; i < Notes.Length; i++) Notes[i] = Notes[i] with { Due = times[i-Cursor] };
-        State = Phase.Playing;
+        if (State != Phase.Paused || !double.IsFinite(firstBeat)) return;
+        SetTimeline(firstBeat,times); State = Phase.Playing;
     }
-    public bool Rechart(IReadOnlyList<double> times)
-    {
-        if (!Active || times.Count < Notes.Length-Cursor || times.Any(t=>!double.IsFinite(t)) ||
-            times.Zip(times.Skip(1),(a,b)=>b-a).Any(gap=>gap<.2)) return false;
-        for (var i=Cursor;i<Notes.Length;i++) Notes[i]=Notes[i] with { Due=times[i-Cursor] };
-        return true;
-    }
-    public void Stop() { State = Phase.Idle; }
-    private void Shift(double amount)
-    {
-        for (var i = Cursor; i < Notes.Length; i++) Notes[i] = Notes[i] with { Due = Notes[i].Due + amount };
-    }
+    public void Align(double firstBeat,IReadOnlyList<double>? times)
+    { if (Active && Prefix.Length==0 && double.IsFinite(firstBeat)) SetTimeline(firstBeat,times); }
+    public void Stop() { State = Phase.Idle; Prefix = ""; Target = null; }
 }
 
-public static class RhythmHands
+// Radius is relative to the fixed receptor. The reverse pulse meets it at
+// the exact event timestamp, independently of frame rate and song interval.
+public static class RhythmPulse
 {
-    private const string Left = "12345qwertasdfgzxcvb";
-    private static readonly string[] Rows = ["12345", "qwert", "asdfg", "zxcvb", "67890", "yuiop", "hjkl;", "nm,./"];
-    public static int Hand(RhythmRound.Note note, bool controller) => controller ? note.Lane / 4 :
-        note.Letter == ' ' ? note.LetterIndex % 2 : Left.Contains(note.Letter) ? 0 : 1;
-    public static string Button(int index) => index switch { 0 => "←", 1 => "↑", 2 => "↓", 3 => "→", 4 => "□", 5 => "△", 6 => "×", 7 => "○", _ => "?" };
-    public static string ButtonName(int index) => index switch { 4 => "□/X",5 => "△/Y",6 => "×/A",7 => "○/B",_=>Button(index) };
-    public static float Alignment(RhythmRound.Note note, bool controller)
+    public static double Radius(double remaining,double interval)
     {
-        if (controller) return note.Lane % 4 switch { 0 => .15f, 3 => .85f, _ => .5f };
-        foreach (var row in Rows) {
-            var at = row.IndexOf(note.Letter);
-            if (at >= 0) return .15f + at * .175f;
-        }
-        return .5f;
+        if (!double.IsFinite(remaining)) return 1.9;
+        if (!double.IsFinite(interval)) interval=.5;
+        return 1+.9*Math.Clamp(remaining/Math.Clamp(interval,.25,1.2),-.12,1);
     }
-    public static string Prompt(RhythmRound.Note note, bool controller) => controller ? ButtonName(note.Lane) : note.Letter == ' ' ? "SPACE" : char.ToUpperInvariant(note.Letter).ToString();
 }

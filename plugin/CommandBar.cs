@@ -102,7 +102,7 @@ public sealed partial class Plugin
     private void StartPlayback(bool restart = false)
     {
         SuspendRhythm();
-        rhythmShown=false;
+        rhythmShown=false;keyboard.AllowRuneDelete=false;
         autoFollow.Authorize();
         // A stale Enter-to-compose request must not reclaim the keyboard on
         // the frame after an explicit . or > command.
@@ -156,10 +156,11 @@ public sealed partial class Plugin
             var focused = foreground == (uint)Environment.ProcessId;
             var otherText = editorOpen || RaptureAtkModule.Instance()->IsTextInputActive() || Dalamud.Bindings.ImGui.ImGui.GetIO().WantTextInput || visible;
             keyboard.Enabled = focused && !otherText;
+            keyboard.AllowRuneDelete = config.RhythmEnabled && rhythmShown;
             UpdateRhythm(focused && !otherText);
             keyboard.Capture = weave.InputMode;
             keyboard.PollBackspace(Environment.TickCount64, (GetAsyncKeyState(0x08) & 0x8000) != 0 &&
-                (GetAsyncKeyState(0x11) & 0x8000) == 0 && (GetAsyncKeyState(0x12) & 0x8000) == 0, weave.Draft.Length > 0);
+                (GetAsyncKeyState(0x11) & 0x8000) == 0 && (GetAsyncKeyState(0x12) & 0x8000) == 0, weave.Draft.Length > 0 || (config.RhythmEnabled && rhythm.Prefix.Length > 0));
             if (!focused || otherText) {
                 InterruptWeave(focused ? "Other text input" : "Game unfocused");
                 while (keyboard.Events.TryDequeue(out var ignored)) { }

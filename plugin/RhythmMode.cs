@@ -1,5 +1,4 @@
 using System.Text.Json;
-using FFXIVClientStructs.FFXIV.Client.System.Input;
 
 namespace XivSpell;
 
@@ -11,12 +10,11 @@ public sealed partial class Plugin
     private bool rhythmShown;
     private bool rhythmStartPending;
     private bool rhythmSongChart;
-    private const double RhythmApproach = 8;
-    private bool rhythmQueued, rhythmAvailable, rhythmPadReleased = true;
-    private bool RhythmPadOwned => !rhythmPadReleased && config.RhythmEnabled && config.RhythmController && rhythm.State is RhythmRound.Phase.Playing or RhythmRound.Phase.Ready;
+    private const double RhythmApproach = 1.2;
+    private bool rhythmQueued, rhythmAvailable;
+    private bool RhythmPadOwned => false; // Controller rhythm is deferred; never lease the pad.
     private long rhythmPoll;
     private readonly float[] rhythmSpectrum = new float[32];
-    private int rhythmCard;
     private string rhythmMusic = "Tempo guide · start Piano or tap along with game music";
     private static double RhythmNow => Environment.TickCount64 / 1000d;
     private readonly RhythmSound rhythmSound = new();
@@ -25,7 +23,7 @@ public sealed partial class Plugin
     private double songPosition, songSampleAt;
     private long songStream, timelinePoll;
     private bool songReady, songPlaying;
-    private double[]? MusicTimes(int count,double lead=RhythmApproach)
+    private double[]? MusicTimes(int count=64,double lead=1.2)
     {
         if (!config.RhythmUsePiano || !songReady || !songPlaying) return null;
         var now=RhythmNow;
@@ -37,7 +35,7 @@ public sealed partial class Plugin
             result.Add(now+pulse.Seconds-position);last=pulse.Seconds;
             if (result.Count==count) return result.ToArray();
         }
-        return null;
+        return result.Count>=2 ? result.ToArray() : null;
     }
 
     private bool RhythmCommand(string args)
@@ -47,14 +45,17 @@ public sealed partial class Plugin
         if (words.Length == 1 || words[1] == "on") {
             config.RhythmEnabled = true; barVisible = true; BeginRhythm();
         } else if (words[1] == "off") {
-            config.RhythmEnabled = false; rhythm.Stop(); composer.Active = false;
+            config.RhythmEnabled = false; keyboard.AllowRuneDelete=false; rhythm.Stop(); composer.Active = false;
             InterruptWeave("Rhythm off", true);
         } else if (words[1] == "tap") rhythmClock.Tap(RhythmNow);
         else if (words[1] == "tempo" && words.Length == 3 && double.TryParse(words[2], System.Globalization.NumberStyles.Float,
             System.Globalization.CultureInfo.InvariantCulture, out var bpm) && double.IsFinite(bpm)) {
             config.RhythmBpm = (float)Math.Clamp(bpm, 50, 220); config.RhythmUsePiano = false;
             rhythmClock.SetTempo(config.RhythmBpm, RhythmNow);
-        } else if (words[1] is "pad" or "keyboard") config.RhythmController = words[1] == "pad";
+        } else if (words[1] is "pad" or "keyboard") {
+            config.RhythmController = false;
+            if (words[1] == "pad") weave.Hint = "Rhythm is keyboard-first · controller spelling is deferred";
+        }
         else if (words[1] == "piano") config.RhythmUsePiano = true;
         else if (words[1] == "offset" && words.Length==3 && float.TryParse(words[2],out var offset) && float.IsFinite(offset))
             config.RhythmLatencyMs=Math.Clamp(offset,-250,250);
@@ -62,9 +63,8 @@ public sealed partial class Plugin
             config.RhythmVolume=Math.Clamp(volume,0,.3f);
         else if (words[1] == "speed" && words.Length==3 && int.TryParse(words[2],out var speed)) config.RhythmSubdivision=Math.Clamp(speed,1,2);
         else if (words[1] == "sound" && words.Length==3 && words[2] is "on" or "off") config.RhythmSound=words[2]=="on";
-        else if (words[1] == "next") ChangeRhythmSpell(1);
-        else if (words[1] == "previous") ChangeRhythmSpell(-1);
-        else { weave.Hint = "rhythm on|off|pad|keyboard|piano|tap|tempo BPM"; return true; }
+        else if (words[1] is "next" or "previous") weave.Hint = "Type any spell · no selection needed";
+        else { weave.Hint = "rhythm on|off|keyboard|piano|tap|tempo BPM"; return true; }
         pi.SavePluginConfig(config); return true;
     }
     private RhythmRound.Spell[] RhythmDeck() => cards.Where(c => c.Phrase.Length is > 0 and <= 64)
@@ -82,32 +82,23 @@ public sealed partial class Plugin
         InterruptWeave("Rhythm composing", false);
         weave.EnterInput();
         rhythm.LatencyMs = config.RhythmLatencyMs;
-        if (rhythm.State == RhythmRound.Phase.Paused) {
-            var times=MusicTimes(rhythm.Notes.Length-rhythm.Cursor);rhythmSongChart=times!=null;
-            if (times!=null) rhythm.Resume(times);
-            else rhythm.Resume(rhythmClock.NextBeat(RhythmNow+RhythmApproach));
-        }
+        config.RhythmController = false;
+        var times=MusicTimes(); rhythmSongChart=times!=null;
+        var first=times?[0] ?? rhythmClock.NextBeat(RhythmNow+1.2);
+        if (rhythm.State == RhythmRound.Phase.Paused) rhythm.Resume(first,times);
         else {
-            var selected=deck[Math.Clamp(rhythmCard,0,deck.Length-1)];var times=MusicTimes(selected.Phrase.Length);rhythmSongChart=times!=null;
-            rhythm.Start(selected, deck,
-                rhythmClock.NextBeat(RhythmNow+RhythmApproach), rhythmClock.Period / config.RhythmSubdivision,
-                times);
-            rhythmQueued = false;
+            rhythm.Start(deck, first, rhythmClock.Period/config.RhythmSubdivision,times);
+            rhythmQueued=false;
         }
-        rhythmShown=true; rhythmPadReleased = false; composer.Active = false; barVisible = true;
-    }
-    private void ChangeRhythmSpell(int direction)
-    {
-        var deck=RhythmDeck();if (deck.Length==0) return;
-        rhythmCard=(rhythmCard+direction+deck.Length)%deck.Length;rhythm.Stop();BeginRhythm();
+        rhythmShown=true; composer.Active=false; barVisible=true;
     }
     private void CreateRhythmHud()
     {
         rhythmHud=new NativeRhythmHud {
-            SelectSpell=ChangeRhythmSpell,
             Toggle=()=>{ if (rhythm.Active) { SuspendRhythm();InterruptWeave("Rhythm paused",true); } else BeginRhythm(); },
             Cast=()=>StartPlayback(),
-            ChangeMode=()=>{ config.RhythmController=!config.RhythmController;SuspendRhythm();pi.SavePluginConfig(config);BeginRhythm(); },
+            Delete=DeleteRhythmSpell,
+            Reset=()=>rhythm.Restart(RhythmNow),
             Tap=()=>{ config.RhythmUsePiano=false;rhythmClock.Tap(RhythmNow);pi.SavePluginConfig(config); },
             Source=()=>{ config.RhythmUsePiano=!config.RhythmUsePiano;pi.SavePluginConfig(config); },
         };
@@ -118,16 +109,15 @@ public sealed partial class Plugin
         if (rhythmHud==null) return;
         rhythmHud.IsVisible=config.RhythmEnabled && rhythmShown && barVisible && objects.LocalPlayer!=null && !gameGui.GameUiHidden;
         if (!rhythmHud.IsVisible) return;
-        var deck=RhythmDeck();
-        rhythmHud.Render(rhythm,config.RhythmController,deck.Length>0 ? deck[Math.Clamp(rhythmCard,0,deck.Length-1)].Name : "Connect your Lua deck",
-            rhythmMusic,rhythmClock.Bpm,weave.Runes.Count,RhythmApproach,rhythmClock.Energy,config.RhythmUsePiano);
+        rhythmHud.Render(rhythm,rhythmMusic,rhythmClock.Bpm,weave.Runes.Select(r=>r.Command).ToArray(),
+            rhythmClock.Energy,config.RhythmUsePiano);
     }
     private void SuspendRhythm()
     {
-        if (config.RhythmEnabled && rhythm.Active) {
+        if (config.RhythmEnabled && (rhythm.Active || rhythm.Completed)) {
             weave.EnterControl();keyboard.Capture=false;
         }
-        rhythm.Pause(RhythmNow); rhythmAvailable = false; rhythmPadReleased = true;rhythmStartPending=false;
+        rhythm.Pause(RhythmNow); rhythmAvailable = false;rhythmStartPending=false;
     }
     private void UpdateRhythm(bool eligible)
     {
@@ -181,63 +171,73 @@ public sealed partial class Plugin
             } catch { /* Piano is optional; never start, pause or change its volume. */ }
             rhythmMusic = rhythmSongChart && songReady ? "Piano · future song chart" : rhythmClock.MusicFresh(now) ? rhythmClock.Source+" · tempo guide" : "Piano unavailable / paused · tempo guide";
         } else if (!config.RhythmUsePiano) rhythmMusic = rhythmClock.Source;
-        if (!rhythmSongChart && rhythm.Active && rhythm.Cursor==0 && rhythm.Hits==0 && MusicTimes(rhythm.Notes.Length)!=null) {
-            rhythm.Stop();BeginRhythm();
+        if (!rhythmSongChart && rhythm.Active && rhythm.Prefix.Length==0 && MusicTimes() is { } readyTimes) {
+            rhythm.Align(readyTimes[0],readyTimes);rhythmSongChart=true;
         }
         rhythm.LatencyMs = config.RhythmLatencyMs;
     }
     private void TickRhythm()
     {
         if (!config.RhythmEnabled || !rhythmAvailable) return;
-        var misses=rhythm.Misses;rhythm.Tick(RhythmNow);
-        if (rhythm.Misses>misses && MusicTimes(rhythm.Notes.Length-rhythm.Cursor,.5) is { } retry) rhythm.Rechart(retry);
-        if (rhythm.Completed && !rhythmQueued && rhythm.Target is { } spell) {
-            rhythmQueued = true;
-            if (weave.Add(spell.Phrase, spell.Id)) {
-                CancelWeaveTicket(weave.Interrupt("Rhythm woven · > cast and move · i weave another", false));
-                weave.EnterControl(); composer.Active = false; keyboard.Capture = false;
-            }
+        rhythm.Tick(RhythmNow);
+        QueueRhythmSpell();
+        if (rhythm.Active && rhythm.Cursor>=rhythm.Notes.Length) {
+            var next=MusicTimes();rhythm.Align(next?[0] ?? rhythmClock.NextBeat(RhythmNow+.5),next);
+            rhythmSongChart=next!=null;
         }
+        else if (rhythm.Active && rhythm.Notes.Length-rhythm.Cursor<12) {
+            var times=MusicTimes(64,.25);
+            rhythm.Extend(times);
+            if (times==null) rhythmSongChart=false;
+        }
+    }
+    private void QueueRhythmSpell()
+    {
+        if (!rhythm.Completed || rhythm.Target is not { } spell) return;
+        if (!weave.Add(spell.Phrase,spell.Id)) { SuspendRhythm(); return; }
+        rhythmQueued=true;rhythm.TakeCompleted(RhythmNow);
+        CancelWeaveTicket(weave.Interrupt("Spell queued · keep spelling, or > cast + move",false));
+        if (weave.Runes.Count>=SpellWeave.Capacity) {
+            SuspendRhythm();rhythm.Notice("WEAVE FULL · Backspace removes a spell · > casts",RhythmNow);
+        }
+    }
+    private void DeleteRhythmSpell()
+    {
+        if (weave.Runes.Count==0) { rhythm.Notice("QUEUE IS ALREADY EMPTY",RhythmNow);return; }
+        CancelWeaveTicket(weave.Backspace());
+        rhythm.Notice("REMOVED LAST QUEUED SPELL",RhythmNow);
+        StopFollowing("Spell removed");
     }
     private bool RhythmKeyboard(SpellKeyboard.Input input)
     {
         if (!config.RhythmEnabled) return false;
+        if (input.Type == SpellKeyboard.Kind.Input) { BeginRhythm();return true; }
+        if (!rhythmShown) return false;
         if (input.Type is SpellKeyboard.Kind.Escape or SpellKeyboard.Kind.Movement) { SuspendRhythm(); return false; }
-        if (input.Type == SpellKeyboard.Kind.Input) {
-            if (config.RhythmController) { config.RhythmController=false;pi.SavePluginConfig(config); }
-            BeginRhythm(); return true;
+        if (input.Type == SpellKeyboard.Kind.Backspace) {
+            if (rhythm.Prefix.Length>0) rhythm.Restart(RhythmNow);
+            else DeleteRhythmSpell();
+            return true;
         }
+        if (input.Type == SpellKeyboard.Kind.ClearLine) {
+            rhythm.Restart(RhythmNow);CancelWeaveTicket(weave.ClearLine());StopFollowing("Weave cleared");
+            if (rhythm.Active) weave.EnterInput();
+            rhythm.Notice("ALL QUEUED SPELLS CLEARED",RhythmNow);return true;
+        }
+        if (input.Type==SpellKeyboard.Kind.TextBackspace) return true;
         if (!rhythm.Active) return false;
-        var at = input.At / 1000d;
-        if (input.Type == SpellKeyboard.Kind.Character) {
-            if (input.Character is '.' or '>') { SuspendRhythm(); StartPlayback(input.Character == '.'); return true; }
-            if (!config.RhythmController) RhythmFeedback(rhythm.Press(input.Character, at));
-            return true;
+        var at=input.At/1000d;
+        if (input.Type==SpellKeyboard.Kind.Character) {
+            if (input.Character is '.' or '>') { SuspendRhythm();StartPlayback(input.Character=='.');return true; }
+            var grade=rhythm.Press(input.Character,at);
+            if (config.RhythmSound && grade is RhythmRound.Grade.Perfect or RhythmRound.Grade.Great or RhythmRound.Grade.Good)
+                rhythmSound.Play(rhythm.Prefix.Length%4,config.RhythmVolume);
+            QueueRhythmSpell();return true;
         }
-        if (input.Type is SpellKeyboard.Kind.Commit or SpellKeyboard.Kind.Complete or SpellKeyboard.Kind.Backspace or SpellKeyboard.Kind.ClearLine or SpellKeyboard.Kind.TextBackspace)
-            return true;
+        if (input.Type==SpellKeyboard.Kind.Commit) { rhythm.Commit(at);QueueRhythmSpell();return true; }
+        if (input.Type==SpellKeyboard.Kind.Complete) {
+            rhythm.Notice("Type any complete spell · Enter queues a shorter matching name",RhythmNow);return true;
+        }
         return false;
-    }
-    private void RhythmFeedback(RhythmRound.Grade grade)
-    {
-        if (config.RhythmSound && grade is RhythmRound.Grade.Perfect or RhythmRound.Grade.Great or RhythmRound.Grade.Good)
-            rhythmSound.Play(rhythm.Notes[Math.Max(0, rhythm.Cursor - 1)].Lane%4, config.RhythmVolume);
-    }
-    private bool RhythmController(uint pressed, long inputTime)
-    {
-        if (!RhythmPadOwned) return false;
-        if ((pressed & (32768u | 16384u)) != 0) { SuspendRhythm(); StartPlayback((pressed & 16384) != 0); return true; }
-        if ((pressed & (uint)(GamepadButtonsFlags.L1|GamepadButtonsFlags.R1)) != 0) {
-            ChangeRhythmSpell((pressed & (uint)GamepadButtonsFlags.L1)!=0 ? -1 : 1);
-            return true;
-        }
-        if (!rhythm.Active) return true;
-        var face = pressed & 255;
-        if (face != 0 && (face & (face - 1)) == 0) {
-            var lane = face switch { 4 => 0, 1 => 1, 2 => 2, 8 => 3, 16 => 4, 128 => 5, 32 => 6, 64 => 7, _ => -1 };
-            var at = inputTime > 0 ? inputTime / 1000d : RhythmNow;
-            RhythmFeedback(rhythm.PressLane(lane, at));
-        }
-        return true;
     }
 }

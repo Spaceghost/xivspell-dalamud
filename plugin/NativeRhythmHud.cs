@@ -7,156 +7,129 @@ using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace XivSpell;
 
-// The same native node/overlay system as the spell runes. No ImGui window,
-// input rectangle or scene-wide mouse capture is involved.
+// A native reverse pulse meets a fixed receptor ring at the song timestamp.
+// Text stays upright and no lane or preselected spell is involved.
 internal sealed class NativeRhythmHud : OverlayNode
 {
-    // XivHud can hide native nameplates while keeping custom HUDs active.
-    // The global UI-display toggle is still respected independently below.
     public override bool HideWithNativeUi => false;
     public override bool HideWithUiToggled => true;
     public override OverlayLayer OverlayLayer => OverlayLayer.AboveUserInterface;
     protected override void OnUpdate() { }
-    private static readonly Vector4 Gold = new(1,.89f,.61f,1), Ice = new(.82f,.97f,1,1);
-    private static readonly Vector4[] Hands = [new(.45f,.94f,.89f,1),new(1,.65f,.82f,1)];
-    private readonly ColorImageNode[] road = new ColorImageNode[64], edges = new ColorImageNode[3];
-    private readonly ColorImageNode[] notes = new ColorImageNode[40], glows = new ColorImageNode[40];
-    private readonly TextNode[] prompts = new TextNode[40], spellLetters = new TextNode[40];
-    private readonly ColorImageNode[] strike = new ColorImageNode[2];
-    private readonly TextNode[] next = new TextNode[2], choices = new TextNode[2];
-    private readonly TextNode title, song, spell, score, feedback, controls;
-    private readonly TextButtonNode previous, following, toggle, cast, mode, tap, source;
-    public Action<int>? SelectSpell { get; init; }
+    private static readonly Vector4 Gold=new(.91f,.78f,.49f,1), Cyan=new(.43f,.94f,.93f,1),
+        Ink=new(.012f,.025f,.041f,1), White=new(.9f,.97f,1,1), Red=new(1,.43f,.42f,1);
+    private readonly ColorImageNode[] ticks=new ColorImageNode[12];
+    private readonly ColorImageNode[] receptor=new ColorImageNode[96], pulse=new ColorImageNode[96], halo=new ColorImageNode[96];
+    private readonly ColorImageNode header, panel, topRule;
+    private readonly TextNode title, song, status, tally, centerCue, timingCue, instruction, word, matches, feedback, queue, deletion, controls;
+    private readonly TextButtonNode toggle, cast, undo, reset, tap, source;
     public Action? Toggle { get; init; }
     public Action? Cast { get; init; }
-    public Action? ChangeMode { get; init; }
+    public Action? Delete { get; init; }
+    public Action? Reset { get; init; }
     public Action? Tap { get; init; }
     public Action? Source { get; init; }
-
     public NativeRhythmHud()
     {
-        Size = new(700,500);
-        for (var i=0;i<road.Length;i++) road[i] = Fill(new(.008f,.018f,.035f,1), .27f);
-        for (var i=0;i<edges.Length;i++) edges[i] = Fill(Gold,.35f);
-        for (var i=0;i<2;i++) {
-            strike[i] = Fill(Hands[i],.85f);
-            next[i] = Text(28,Hands[i]); choices[i] = Text(13,Ice);
+        Size=new(620,650);
+        header=Fill(Ink,.92f);
+        for(var i=0;i<ticks.Length;i++) ticks[i]=Fill(Gold,.45f);
+        for(var i=0;i<pulse.Length;i++) {
+            receptor[i]=Fill(Gold,.65f);halo[i]=Fill(Cyan,.16f);pulse[i]=Fill(Cyan,.9f);
         }
-        for (var i=0;i<notes.Length;i++) {
-            glows[i] = Fill(Gold,.22f); notes[i] = Fill(Hands[0],.8f);
-            prompts[i] = Text(32,Ice); spellLetters[i] = Text(16,Gold);
-        }
-        title = Text(17,Gold); song = Text(13,Ice); spell = Text(21,Ice);
-        score = Text(14,Gold); feedback = Text(22,Ice); controls = Text(13,Gold);
-        previous = Button("‹",()=>SelectSpell?.Invoke(-1),36);
-        following = Button("›",()=>SelectSpell?.Invoke(1),36);
-        toggle = Button("WEAVE",()=>Toggle?.Invoke(),80);
-        cast = Button("CAST + MOVE",()=>Cast?.Invoke(),120);
-        mode = Button("KEYBOARD",()=>ChangeMode?.Invoke(),110);
-        tap = Button("TAP BEAT",()=>Tap?.Invoke(),85);
-        source = Button("PIANO",()=>Source?.Invoke(),85);
+        panel=Fill(Ink,.94f);topRule=Fill(Gold,.9f);
+        centerCue=Text(28,White);timingCue=Text(12,Gold);
+        centerCue.AlignmentType=timingCue.AlignmentType=AlignmentType.Center;
+        title=Text(16,Gold);song=Text(12,White);status=Text(12,Cyan);tally=Text(12,Gold);
+        instruction=Text(12,Gold);word=Text(34,White);matches=Text(13,White);
+        feedback=Text(15,Cyan);queue=Text(13,Gold);deletion=Text(12,White);controls=Text(12,Gold);
+        toggle=Button("WEAVE",()=>Toggle?.Invoke(),86);
+        cast=Button("CAST + MOVE",()=>Cast?.Invoke(),124);
+        undo=Button("UNDO SPELL",()=>Delete?.Invoke(),112);
+        reset=Button("RESET WORD",()=>Reset?.Invoke(),112);
+        tap=Button("TAP",()=>Tap?.Invoke(),54);source=Button("PIANO",()=>Source?.Invoke(),68);
     }
     private ColorImageNode Fill(Vector4 color,float alpha)
     {
-        var node = new ColorImageNode { Color=color, Alpha=alpha, IsVisible=true };
-        node.AttachNode(this,NodePosition.AsLastChild); return node;
+        var n=new ColorImageNode {Color=color,Alpha=alpha,IsVisible=true};n.AttachNode(this,NodePosition.AsLastChild);return n;
     }
     private TextNode Text(uint size,Vector4 color)
     {
-        var node = new TextNode { FontSize=size,TextColor=color,TextOutlineColor=new(0,0,.015f,1),
-            TextFlags=TextFlags.Edge|TextFlags.Bold,Size=new(700,40),IsVisible=true };
-        node.AttachNode(this,NodePosition.AsLastChild); return node;
+        var n=new TextNode {FontSize=size,TextColor=color,TextOutlineColor=new(0,0,.015f,1),
+            TextFlags=TextFlags.Edge|TextFlags.Bold,Size=new(620,40),IsVisible=true};
+        n.AttachNode(this,NodePosition.AsLastChild);return n;
     }
     private TextButtonNode Button(string label,Action action,float width)
     {
-        var node = new TextButtonNode { String=label,Size=new(width,24),OnClick=action,IsVisible=true };
-        node.AttachNode(this,NodePosition.AsLastChild); return node;
+        var n=new TextButtonNode {String=label,Size=new(width,26),OnClick=action,IsVisible=true};
+        n.AttachNode(this,NodePosition.AsLastChild);return n;
     }
-    public void Render(RhythmRound round,bool controller,string selected,string music,double bpm,
-        int queued,double approach,float energy,bool piano)
+    private static void Box(ColorImageNode n,float x,float y,float w,float h) {n.Position=new(x,y);n.Size=new(w,h);}
+    private static void Label(TextNode n,float x,float y,float w,string value) {n.Position=new(x,y);n.Size=new(w,(float)n.FontSize+8);n.String=value;}
+    private static void Segment(ColorImageNode node,Vector2 from,Vector2 to,float thickness)
     {
-        var viewport = Dalamud.Bindings.ImGui.ImGui.GetMainViewport().Size;
-        var width = Math.Clamp(viewport.X*.43f,440,760);
-        var height = Math.Clamp(viewport.Y*.36f,250,400);
-        Size = new(width,height+220);
-        Position = new((viewport.X-width)/2,MathF.Max(54,viewport.Y*.09f));
-        var now = round.State==RhythmRound.Phase.Paused ? round.PausedAt : Environment.TickCount64/1000d;
-        const float top=80;
-        var horizon = width*.12f;
-        for (var row=0;row<32;row++) {
-            var t=(float)row/32; var y=top+height*t*t; var nextY=top+height*((row+1)/32f)*((row+1)/32f);
-            var half=(horizon+(width*.84f-horizon)*t)/2;
-            for (var hand=0;hand<2;hand++) {
-                var node=road[row*2+hand];
-                node.Position=new(width/2+(hand-1)*half,y); node.Size=new(half,nextY-y+1);
-                node.Alpha=.16f+.1f*t;
-            }
+        var delta=to-from;node.Position=from;node.Size=new(thickness,delta.Length()+.5f);
+        node.RotationDegrees=-MathF.Atan2(delta.X,delta.Y)*180/MathF.PI;
+    }
+    private static void Ring(ColorImageNode[] nodes,Vector2 center,float radius,float thickness,Vector4 color,float alpha)
+    {
+        for(var i=0;i<nodes.Length;i++) {
+            var a=i*MathF.Tau/nodes.Length;var b=(i+1)*MathF.Tau/nodes.Length;
+            Segment(nodes[i],center+new Vector2(MathF.Cos(a),MathF.Sin(a))*radius,
+                center+new Vector2(MathF.Cos(b),MathF.Sin(b))*radius,thickness);
+            nodes[i].Color=color;nodes[i].Alpha=alpha;
         }
-        var bottom = top+height;
-        var laneWidth=width*.42f;
-        for (var edge=0;edge<3;edge++) {
-            var start=new Vector2(width/2+(edge-1)*horizon/2,top);
-            var end=new Vector2(width/2+(edge-1)*laneWidth,bottom);
-            var delta=end-start;
-            edges[edge].Position=start;edges[edge].Size=new(edge==1 ? 1 : 2,delta.Length());
-            edges[edge].RotationDegrees=-MathF.Atan2(delta.X,delta.Y)*180/MathF.PI;
-            edges[edge].Alpha=edge==1 ? .2f : .55f;
+    }
+    public void Render(RhythmRound round,string music,double bpm,string[] queued,double energy,bool piano)
+    {
+        var viewport=Dalamud.Bindings.ImGui.ImGui.GetMainViewport().Size;
+        var width=Math.Clamp(viewport.X*.32f,590,640);
+        Size=new(width,622);
+        Position=new((viewport.X-width)/2,MathF.Max(50,viewport.Y*.09f));
+        var center=new Vector2(width/2,196);
+        const float targetRadius=64, rim=125, panelY=342;
+        var now=(round.State==RhythmRound.Phase.Paused ? round.PausedAt : Environment.TickCount64/1000d)
+            -Math.Clamp(double.IsFinite(round.LatencyMs) ? round.LatencyMs : 0,-250,250)/1000;
+        var remaining=round.Cursor<round.Notes.Length ? round.Notes[round.Cursor].Due-now : 1;
+        var interval=round.Cursor>0 && round.Cursor<round.Notes.Length
+            ? round.Notes[round.Cursor].Due-round.Notes[round.Cursor-1].Due : 60/bpm;
+        var radius=targetRadius*(float)RhythmPulse.Radius(remaining,interval);
+        var inWindow=round.Active && Math.Abs(remaining)<=round.HitWindow;
+        var onBeat=round.Active && Math.Abs(remaining)<=.065;
+        var fail=round.LastGrade is RhythmRound.Grade.Miss or RhythmRound.Grade.Wrong or RhythmRound.Grade.Early;
+        var recent=Environment.TickCount64/1000d-round.LastFeedback<1.8;
+        var accent=recent && fail ? Red : Cyan;
+        Box(header,0,0,width,64);
+        Label(title,18,9,width-150,"GRIMOIRE   /   SPELLSTRINGS");
+        Label(status,width-132,12,120,round.Active ? "●  SPELLING" : "Ⅱ  PAUSED");
+        status.TextColor=round.Active ? Cyan : Gold;
+        Label(song,18,36,width-168,WeavePresentation.Clip(music+"   ·   "+bpm.ToString("F0")+" BPM",(int)((width-170)/6.5f)));
+        Label(tally,width-132,36,120,$"{round.Score:N0}  ·  {round.Combo}x");
+        for(var i=0;i<ticks.Length;i++) {
+            var a=i*MathF.Tau/ticks.Length;var direction=new Vector2(MathF.Cos(a),MathF.Sin(a));
+            Segment(ticks[i],center+direction*(rim-7),center+direction*(rim+1),i%3==0 ? 2 : 1);
         }
-        for (var hand=0;hand<2;hand++) {
-            var left=width/2+(hand-1)*laneWidth;
-            strike[hand].Position=new(left+3,bottom);strike[hand].Size=new(laneWidth-6,3);
-            strike[hand].Alpha=.6f+energy*.3f;
-            next[hand].Position=new(left+6,bottom+8);next[hand].Size=new(laneWidth-8,38);
-            next[hand].String=hand==0 ? "LEFT" : "RIGHT";next[hand].Alpha=.4f;
-            choices[hand].Position=new(left-36,bottom+48);choices[hand].Size=new(laneWidth+72,26);
-            choices[hand].String="";
-        }
-        if (round.Cursor<round.Notes.Length) {
-            var note=round.Notes[round.Cursor];var hand=RhythmHands.Hand(note,controller);
-            next[hand].String="PRESS  "+RhythmHands.Prompt(note,controller);next[hand].Alpha=1;
-            if (controller) for (var h=0;h<2;h++)
-                choices[h].String=string.Join("   ",Enumerable.Range(h*4,4).Select(i=>RhythmHands.Button(i)+" "+char.ToUpperInvariant(note.Choices[i])));
-        }
-        var slot=0;
-        for (var i=round.Cursor;i<round.Notes.Length && slot<notes.Length;i++) {
-            var note=round.Notes[i];var remaining=note.Due-now;
-            if (remaining>approach || remaining<-.4) continue;
-            var t=(float)Math.Clamp(1-remaining/approach,0,1.04);
-            var hand=RhythmHands.Hand(note,controller);
-            var half=(horizon+(width*.84f-horizon)*t)/2;
-            var left=width/2+(hand-1)*half;
-            var x=left+half*(.17f+.66f*RhythmHands.Alignment(note,controller));
-            var y=top+height*t*t;
-            var scale=.32f+.68f*t;
-            var label=RhythmHands.Prompt(note,controller);
-            var keyWidth=(label.Length>2 ? 100 : 60)*scale;
-            glows[slot].IsVisible=notes[slot].IsVisible=prompts[slot].IsVisible=spellLetters[slot].IsVisible=true;
-            glows[slot].Position=new(x-keyWidth/2-4,y-23*scale);glows[slot].Size=new(keyWidth+8,48*scale);
-            glows[slot].Color=Hands[hand];glows[slot].Alpha=.12f+.18f*t;
-            notes[slot].Position=new(x-keyWidth/2,y-20*scale);notes[slot].Size=new(keyWidth,3*scale);notes[slot].Color=Hands[hand];
-            prompts[slot].Position=new(x-keyWidth/2+6*scale,y-18*scale);prompts[slot].Size=new(keyWidth,38*scale);
-            prompts[slot].FontSize=(uint)Math.Clamp(32*scale,12,36);prompts[slot].String=label;prompts[slot].TextColor=Hands[hand];
-            spellLetters[slot].Position=new(x-keyWidth/2+4*scale,y+17*scale);spellLetters[slot].Size=new(keyWidth+24,24);
-            spellLetters[slot].FontSize=(uint)Math.Clamp(15*scale,10,17);
-            spellLetters[slot].String=controller ? "type "+(note.Letter==' ' ? "SPACE" : char.ToUpperInvariant(note.Letter).ToString()) : "";
-            slot++;
-        }
-        for (;slot<notes.Length;slot++) glows[slot].IsVisible=notes[slot].IsVisible=prompts[slot].IsVisible=spellLetters[slot].IsVisible=false;
-        title.Position=new(0,0);title.String="GRIMOIRE  ◇  SPELLSTRINGS";
-        song.Position=new(0,24);song.Size=new(width,22);song.String=WeavePresentation.Clip(music+"  ·  "+bpm.ToString("F0")+" BPM  ·  "+approach.ToString("F0")+"s approach",(int)(width/7));
-        spell.Position=new(0,50);spell.Size=new(width,30);spell.String=(round.Target?.Phrase ?? selected).ToUpperInvariant();
-        score.Position=new(width*.55f,52);score.Size=new(width*.45f,26);score.String=$"{round.Score:N0}  ·  {round.Combo}x  ·  {round.Stars}/5  ·  {queued} RUNES";
-        feedback.Position=new(width/2-100,bottom-80);feedback.Size=new(250,40);
-        feedback.IsVisible=Environment.TickCount64/1000d-round.LastFeedback<.7;
-        feedback.String=round.LastGrade.ToString().ToUpperInvariant();
-        if (round.Active && round.Cursor==0 && round.Notes.Length>0 && round.Notes[0].Due-now>1) {
-            feedback.IsVisible=true;feedback.String="IN "+Math.Ceiling(round.Notes[0].Due-now).ToString("F0");
-        }
-        controls.Position=new(0,bottom+78);controls.Size=new(width,24);
-        controls.String=controller ? "L1/R1 spell  ·  both sticks weave/pause  ·  R3 cast + move" : "Type the key  ·  Esc pause  ·  > cast + move  ·  i weave";
-        previous.Position=new(0,bottom+106);following.Position=new(38,bottom+106);toggle.Position=new(80,bottom+106);
-        cast.Position=new(164,bottom+106);mode.Position=new(288,bottom+106);tap.Position=new(402,bottom+106);source.Position=new(491,bottom+106);
+        Ring(receptor,center,targetRadius,inWindow ? 2.5f : 1.3f,inWindow ? Cyan : Gold,inWindow ? .95f : .6f);
+        Ring(halo,center,radius,onBeat ? 14 : 7,accent,onBeat ? .34f : .12f);
+        Ring(pulse,center,radius,2.5f,accent,round.Active ? .9f : .4f);
+        Label(centerCue,center.X-55,center.Y-24,110,onBeat ? "NOW" : inWindow ? "TYPE" : round.Active ? "WAIT" : "PAUSE");
+        centerCue.TextColor=onBeat ? White : inWindow ? Cyan : new(.6f,.76f,.79f,1);
+        Label(timingCue,center.X-51,center.Y+15,110,onBeat ? "ON THE BEAT" : "RINGS MEET");
+        Box(panel,0,panelY,width,208);Box(topRule,0,panelY,width,1);
+        Label(instruction,18,panelY+12,width-30,"TYPE ANY SPELL   /   WHEN THE RINGS MEET");
+        word.FontSize=(uint)(round.Prefix.Length>22 ? 24 : 34);
+        Label(word,18,panelY+37,width-32,round.Prefix.Length==0 ? "Type a spell…" : round.Prefix.ToUpperInvariant()+"_");
+        word.TextColor=round.Prefix.Length>0 ? White : new(.52f,.66f,.7f,1);
+        var candidates=round.Matches.Take(4).Select(s=>s.Name).ToArray();
+        var candidateText=round.Prefix.Length>0 ? string.Join("   /   ",candidates) : "No spell selection. Begin on any pulse.";
+        Label(matches,18,panelY+82,width-32,WeavePresentation.Clip(candidateText,74));
+        Label(feedback,18,panelY+108,width-32,recent ? round.Feedback : round.Prefix.Length>0 ? "NEXT   "+round.NextLetters : "Let the outer ring meet the inner ring, then type.");
+        feedback.TextColor=recent && fail ? Red : Cyan;
+        Label(queue,18,panelY+144,width-32,$"{queued.Length} / {SpellWeave.Capacity} QUEUED"+(queued.Length>0 ? "   ·   LAST: "+WeavePresentation.Clip(queued[^1].ToUpperInvariant(),38) : "   ·   Spelling queues; it never casts."));
+        Label(deletion,18,panelY+173,width-32,round.Prefix.Length>0 ? "BACKSPACE  restart this word   ·   press again to undo the last queued spell" : "BACKSPACE  undo last queued spell   ·   HOLD BACKSPACE  clear the queue");
+        toggle.Position=new(0,panelY+220);undo.Position=new(90,panelY+220);reset.Position=new(206,panelY+220);
+        cast.Position=new(322,panelY+220);tap.Position=new(450,panelY+220);source.Position=new(508,panelY+220);
         toggle.String=round.Active ? "PAUSE" : round.State==RhythmRound.Phase.Paused ? "RESUME" : "WEAVE";
-        mode.String=controller ? "CONTROLLER" : "KEYBOARD";source.String=piano ? "PIANO" : "GUIDE";
+        source.String=piano ? "PIANO" : "GUIDE";
+        Label(controls,0,panelY+254,width,"ESC  pause / move    ·    i  weave    ·    >  cast + move    ·    ENTER  queue exact name");
     }
 }

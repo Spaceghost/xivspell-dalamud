@@ -193,7 +193,7 @@ public sealed partial class Plugin : IDalamudPlugin
             playbackPaused = weave.Paused, runeCount = weave.Runes.Count, padOwned = RhythmPadOwned,
             clockNow = RhythmNow,
             nextNote = rhythm.Cursor < rhythm.Notes.Length ? rhythm.Notes[rhythm.Cursor] : null,
-            renderer="native", lanes=2, approachSeconds=RhythmApproach, songTimelineReady=songReady,
+            renderer="native", visualization="reverse pulse", lanes=0, spelling="free", prefix=rhythm.Prefix, approachSeconds=RhythmApproach, songTimelineReady=songReady,
             songChart=rhythmSongChart, futurePulses=futurePulses.Length,
         };
         if (r.Method is "compiled" or "translated") {

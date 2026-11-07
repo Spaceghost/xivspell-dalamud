@@ -35,29 +35,36 @@ and model. Do not copy another player's configuration or credentials.
 ## Rhythm weaving
 
 `/xivspell rhythm on` opens **Spellstrings** in the existing native spell HUD.
-Two perspective lanes approach from the distance: left and right. Keyboard notes
-show the exact letter at its hand/column position; controller notes show the
-D-pad direction on the left or face button on the right, with the letter it types.
-Each complete spell queues one rune. Misses retain the untyped letter.
+A reverse pulse contracts toward a fixed target ring. Type when the rings meet.
+Type **any spell** from your Lua deck, one character per pulse; there is no spell picker or prescribed sequence.
+The upright word display shows your prefix and matching spells. Wrong letters,
+off-beat characters, or a missed pulse during a word reset that entire word.
+Empty pulses before starting a word are optional.
 
-For controllers use `/xivspell rhythm pad`: both sticks weave/pause, L1/R1 choose
-a spell, R3 casts and releases movement, and L3 repeats. The eight button choices
-come from available spell-name completions, with distinct decoys filling spare
-buttons. Keyboard mode uses `>` to cast and move, `.` to repeat, `i` to weave
-another, and Escape to pause. Native buttons also choose spells, pause/resume,
-change input mode, cast, select Piano/guide timing and tap a beat.
-The both-stick chord also selects controller mode directly; `i` from control
-mode selects keyboard spelling, so either device can start without a mouse.
+A complete unambiguous spell queues one rune and leaves spelling active for the
+next spell. If a name is also the beginning of a longer spell, keep typing the
+longer name or press **Enter** to queue the exact shorter name. Spaces inside
+multiword names are timed characters too.
+
+**Backspace** restarts an unfinished word. With an empty word it removes the
+last queued spell; hold it to clear the queue. Visible **UNDO SPELL** and
+**RESET WORD** buttons make those actions available without remembering keys.
+Escape pauses, `i` resumes weaving, `>` casts and returns movement control,
+and `.` repeats. Completion alone never casts.
+
+Rhythm input is keyboard-only for now and takes no controller lease. A future
+radial spelling selector, with hover or trigger confirmation, is deferred.
+Normal non-rhythm controller composition remains available with rhythm off.
 
 Piano's optional `XivPiano.RhythmTimeline.v1` feed supplies up to 30 seconds of
 future song onsets from a separate background decode of its downloaded song.
 The chart uses those future timings when enough pulses are available; an
-eight-second perspective approach makes the exact keys visible well in advance.
+approach ring uses the upcoming song timestamp for each pulse.
 These are measured energy onsets, not pitch transcription or guaranteed musical
 beats. A missing/unfinished map uses a clearly labelled tempo guide. Piano's
 `AudioFeatures.v1` feed still supplies live energy and a beat estimate.
 
-For game music, select GUIDE and tap the native **TAP BEAT** button, or set
+For game music, select GUIDE and tap the native **TAP** button, or set
 `/xivspell rhythm tempo 120`. Other tuning commands are `rhythm offset 100`
 (milliseconds), `rhythm speed 1` or `2`, `rhythm sound on|off`, and `rhythm volume
 0.1`. Quiet synthesized plucks mix through the default output without changing

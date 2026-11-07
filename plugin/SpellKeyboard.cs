@@ -14,7 +14,7 @@ internal sealed class SpellKeyboard : IDisposable
         internal long At { get; init; } = Environment.TickCount64;
     }
     internal readonly ConcurrentQueue<Input> Events = new();
-    internal bool Enabled, Capture = true;
+    internal bool Enabled, Capture = true, AllowRuneDelete;
     internal volatile bool CaptureCombatEnter;
     private int combatEnterRequested;
     internal bool TakeCombatEnter() => Interlocked.Exchange(ref combatEnterRequested, 0) != 0;
@@ -24,7 +24,7 @@ internal sealed class SpellKeyboard : IDisposable
     internal void PollBackspace(long now, bool down, bool hasDraft = false)
     {
         lock (backspaceGate) {
-            if (backspace.Poll(now, down, Enabled && Capture, hasDraft)) Events.Enqueue(new(Kind.ClearLine));
+            if (backspace.Poll(now, down, Enabled && (Capture || AllowRuneDelete), hasDraft)) Events.Enqueue(new(Kind.ClearLine));
             else if (backspace.EraseText) Events.Enqueue(new(Kind.TextBackspace));
         }
     }
@@ -68,7 +68,7 @@ internal sealed class SpellKeyboard : IDisposable
                     if (key == 0x1B) { if (fresh) { Capture = false; Events.Enqueue(new(Kind.Escape)); } }
                     else if (key is >= 0x25 and <= 0x28 || (!Capture && key is 0x57 or 0x41 or 0x53 or 0x44)) {
                         if (fresh) Events.Enqueue(new(Kind.Movement));
-                    } else if (Capture && key is 0x08 or 0x09 or 0x0D) {
+                    } else if ((Capture && key is 0x08 or 0x09 or 0x0D) || (AllowRuneDelete && key == 0x08)) {
                         if (key == 0x08 && fresh) { lock (backspaceGate) backspace.Press(Environment.TickCount64); }
                         if (fresh) Events.Enqueue(new(key == 0x08 ? Kind.Backspace : key == 0x09 ? Kind.Complete : Kind.Commit));
                         return 0;
@@ -79,6 +79,7 @@ internal sealed class SpellKeyboard : IDisposable
                     if (ch is '.' or '>') { Events.Enqueue(new(Kind.Character, ch)); return 0; }
                     if (!Capture && ch == ':') { Capture = true; Events.Enqueue(new(Kind.Input)); Events.Enqueue(new(Kind.Character, ch)); return 0; }
                     if (!Capture && ch is 'i' or 'I') { Capture = true; Events.Enqueue(new(Kind.Input)); return 0; }
+                    if (AllowRuneDelete && ch == '\b') return 0;
                     if (Capture) { if (!char.IsControl(ch)) Events.Enqueue(new(Kind.Character, ch)); return 0; }
                 }
             }
