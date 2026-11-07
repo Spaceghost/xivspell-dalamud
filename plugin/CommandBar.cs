@@ -307,7 +307,7 @@ public sealed partial class Plugin
 internal sealed class WeaveHud : OverlayNode
 {
     public Action<string>? OpenSource { get; init; }
-    public override bool HideWithNativeUi => true;
+    public override bool HideWithNativeUi => false;
     public override bool HideWithUiToggled => true;
     public override OverlayLayer OverlayLayer => OverlayLayer.AboveUserInterface;
     protected override void OnUpdate() { }

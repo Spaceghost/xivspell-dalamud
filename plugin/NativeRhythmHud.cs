@@ -11,7 +11,9 @@ namespace XivSpell;
 // input rectangle or scene-wide mouse capture is involved.
 internal sealed class NativeRhythmHud : OverlayNode
 {
-    public override bool HideWithNativeUi => true;
+    // XivHud can hide native nameplates while keeping custom HUDs active.
+    // The global UI-display toggle is still respected independently below.
+    public override bool HideWithNativeUi => false;
     public override bool HideWithUiToggled => true;
     public override OverlayLayer OverlayLayer => OverlayLayer.AboveUserInterface;
     protected override void OnUpdate() { }
