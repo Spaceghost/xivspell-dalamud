@@ -190,6 +190,8 @@ public sealed partial class Plugin : IDalamudPlugin
             rhythm.Score, rhythm.Hits, rhythm.Misses, rhythm.Combo, rhythm.Cursor,
             target = rhythm.Target?.Phrase, queued = rhythmQueued, inputMode = weave.InputMode,
             playbackPaused = weave.Paused, runeCount = weave.Runes.Count, padOwned = RhythmPadOwned,
+            clockNow = RhythmNow,
+            nextNote = rhythm.Cursor < rhythm.Notes.Length ? rhythm.Notes[rhythm.Cursor] : null,
         };
         if (r.Method is "compiled" or "translated") {
             if (r.RequestId != draftRequest || weave.DraftRevision != draftRequestRevision || !weave.InputMode) return new { discarded = true };

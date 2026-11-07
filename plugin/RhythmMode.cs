@@ -210,7 +210,8 @@ public sealed partial class Plugin
             var c = RhythmColors[note.Lane];
             draw.AddRectFilled(new(x + 8,y - 15), new(x + laneWidth - 8,y + 15), Color(c with { W = .9f }), 8);
             var text = note.Letter == ' ' ? "SPACE" : char.ToUpperInvariant(note.Letter).ToString();
-            draw.AddText(new(x + laneWidth / 2 - ImGui.CalcTextSize(text).X / 2,y - 8), Color(new(.025f,.04f,.08f,1)), text);
+            var fontSize = ImGui.GetFontSize() * 1.5f;
+            draw.AddText(ImGui.GetFont(), fontSize, new(x + laneWidth / 2 - ImGui.CalcTextSize(text).X * .75f,y - fontSize / 2), Color(new(.025f,.04f,.08f,1)), text);
         }
         if (now - rhythm.LastFeedback < .7) {
             var good = rhythm.LastGrade is RhythmRound.Grade.Perfect or RhythmRound.Grade.Great or RhythmRound.Grade.Good;

@@ -36,13 +36,14 @@ public sealed class RhythmClock
         Source = "XivPiano / " + (Locked ? "estimated beat" : "learning beat");
         // The producer reports an onset envelope, not a beat. Ignore its decay
         // and estimate a stable grid only after several plausible intervals.
-        if (onset < .3f || double.IsFinite(lastOnset) && now - lastOnset < .24) return;
-        if (double.IsFinite(lastOnset)) ObserveInterval(now - lastOnset);
-        lastOnset = now;
+        var detected = now - age;
+        if (onset < .3f || double.IsFinite(lastOnset) && detected - lastOnset < .24) return;
+        if (double.IsFinite(lastOnset)) ObserveInterval(detected - lastOnset);
+        lastOnset = detected;
         if (Locked) {
-            var nearest = anchor + Math.Round((now - anchor) / Period) * Period;
-            anchor += Math.Clamp(now - nearest, -.025, .025);
-        } else anchor = now;
+            var nearest = anchor + Math.Round((detected - anchor) / Period) * Period;
+            anchor += Math.Clamp(detected - nearest, -.025, .025);
+        } else anchor = detected;
     }
     private void ObserveInterval(double value)
     {
