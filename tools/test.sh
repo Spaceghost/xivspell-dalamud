@@ -3,6 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 dotnet run --project tests/weave/WeaveTests.csproj -c Release
+dotnet run --project tests/rhythm/RhythmTests.csproj -c Release
 for test in tests/*.lua; do
   [[ "$test" == tests/lsp.lua ]] && continue
   nvim --headless -u NONE -l "$test"

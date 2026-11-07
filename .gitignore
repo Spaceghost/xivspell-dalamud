@@ -6,5 +6,7 @@ cards/.history/
 doc/tags
 tests/weave/bin/
 tests/weave/obj/
+tests/rhythm/bin/
+tests/rhythm/obj/
 .dalamud/
 release/

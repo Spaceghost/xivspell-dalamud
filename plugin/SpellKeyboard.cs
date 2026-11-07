@@ -9,7 +9,10 @@ namespace XivSpell;
 internal sealed class SpellKeyboard : IDisposable
 {
     internal enum Kind { Character, Escape, Input, Backspace, TextBackspace, ClearLine, Complete, Commit, Movement }
-    internal readonly record struct Input(Kind Type, char Character = '\0');
+    internal readonly record struct Input(Kind Type, char Character = '\0')
+    {
+        internal long At { get; init; } = Environment.TickCount64;
+    }
     internal readonly ConcurrentQueue<Input> Events = new();
     internal bool Enabled, Capture = true;
     internal volatile bool CaptureCombatEnter;

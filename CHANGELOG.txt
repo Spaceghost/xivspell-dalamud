@@ -1,3 +1,18 @@
+2026-11-07 / Spellstrings rhythm weaving (development)
+
+Keyboard spelling and four-button controller charts bring a scrolling letter
+highway, four-beat count-in, graded timing, combos and music-reactive colour to
+the native spell workshop. Piano's audio-feature feed supplies estimated timing
+and spectrum; manual tap tempo can follow game music. Quiet synthesized plucks
+mix with the music without controlling it. Offset calibration is adjustable.
+
+Completion choices supply the next-character alternatives and distinct decoys.
+Misses retain the expected letter; every letter must be played before a rune
+is queued. A separate > / R3 transition starts casting and releases movement.
+Escape, focus loss and other text entry pause a round without discarding it.
+Offline timing, retry, input ownership and modal-casting checks pass. Actual
+keyboard/controller play and musical feel require player acceptance.
+
 2026-10-31 / readiness belongs to Lua-selected actions
 
 Preview icons no longer gate execution of custom conditional programs.

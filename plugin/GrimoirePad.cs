@@ -47,7 +47,7 @@ internal sealed unsafe class GrimoirePad : IDisposable
                 chordHeld = chord;
                 if (chord) Filter(ref pad->GamepadInputData, (uint)(GamepadButtonsFlags.L3 | GamepadButtonsFlags.R3));
                 var sample = new GrimoirePadSample(1, (uint)raw.Buttons, raw.LeftStickX / 100f, -raw.LeftStickY / 100f,
-                    raw.RightStickX / 100f, -raw.RightStickY / 100f, raw.PSButton == 0 && raw.MuteButton == 0);
+                    raw.RightStickX / 100f, -raw.RightStickY / 100f, raw.PSButton == 0 && raw.MuteButton == 0, Environment.TickCount64);
                 var filter = lease.Poll(sample, true, Now);
                 if (filter.All) {
                     ref var input = ref pad->GamepadInputData;

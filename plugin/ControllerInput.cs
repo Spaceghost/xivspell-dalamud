@@ -11,17 +11,23 @@ public sealed partial class Plugin
     {
         if (pad == null) return;
         eligible &= !gamepad.EnableGamepadNav;
-        var frame = pad.Read(eligible, composer.Active);
+        var frame = pad.Read(eligible, composer.Active || RhythmPadOwned);
         if (!eligible) { composer.Active = false; return; }
         if (pad.TakeOpen()) {
+            if (config.RhythmEnabled && config.RhythmController) {
+                if (rhythm.Active) { SuspendRhythm(); InterruptWeave("Rhythm paused", true); }
+                else BeginRhythm();
+                padSequence = 0; return;
+            }
             composer.Active = !composer.Active; padSequence = 0;
             if (composer.Active) { InterruptWeave("Controller composing", true); barVisible = true; }
         }
-        if (!composer.Active || frame is not { Phase: "Active" } f || f.Sequence == 0) { padSequence = 0; return; }
+        if ((!composer.Active && !RhythmPadOwned) || frame is not { Phase: "Active" } f || f.Sequence == 0) { padSequence = 0; return; }
         if (f.Session != padSession) { padSession = f.Session; padSequence = 0; }
         if (f.Sequence <= padSequence) return;
         padSequence = f.Sequence;
         var pressed = f.Pressed;
+        if (RhythmController(pressed, f.InputTime)) return;
         if ((pressed & 128) != 0) { CardInput("cancel", "voice"); composer.Active = false; InterruptWeave("Stopped", true); return; }
         if ((pressed & 32768) != 0) { StartPlayback(); return; }
         if ((pressed & 16384) != 0) { StartPlayback(true); return; }

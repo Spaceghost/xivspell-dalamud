@@ -28,6 +28,14 @@ public sealed class Config : IPluginConfiguration
     public string EditorOriginal { get; set; } = "";
     public bool EditorOpen { get; set; }
     public bool AutoFollow { get; set; } = true;
+    public bool RhythmEnabled;
+    public bool RhythmController;
+    public bool RhythmUsePiano = true;
+    public float RhythmBpm = 120;
+    public float RhythmLatencyMs;
+    public int RhythmSubdivision = 1;
+    public bool RhythmSound = true;
+    public float RhythmVolume = .10f;
     public string Token { get; set; } = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 }
 
@@ -79,6 +87,8 @@ public sealed partial class Plugin : IDalamudPlugin
         actionEffects = new ActionEffects(interop);
         try { pad = new GrimoirePad(interop); } catch (Exception ex) { log.Warning(ex, "Grimoire controller capture unavailable"); }
         config = pi.GetPluginConfig() as Config ?? new Config();
+        config.RhythmSubdivision = Math.Clamp(config.RhythmSubdivision, 1, 2);
+        rhythmClock.SetTempo(config.RhythmBpm, RhythmNow);
         weave.Restore(config.Weave);
         weave.EnterInput();
         editorCard = config.EditorCard; editorSource = config.EditorSource; editorSavedSource = config.EditorOriginal;
@@ -87,7 +97,8 @@ public sealed partial class Plugin : IDalamudPlugin
         editorOpen = config.EditorOpen && editorCard.Length > 0 && editorSource != editorSavedSource;
         pi.SavePluginConfig(config);
         commands.AddHandler("/xivspell", new CommandInfo((_, args) => {
-            if (args == "off") { InterruptWeave("Disarmed", true); armed = false; StopFollowing("Disarmed"); }
+            if (RhythmCommand(args)) { }
+            else if (args == "off") { SuspendRhythm(); InterruptWeave("Disarmed", true); armed = false; StopFollowing("Disarmed"); }
             else if (args is "autofollow" or "autofollow on" or "autofollow off") {
                 config.AutoFollow = args == "autofollow on" || (args == "autofollow" && !config.AutoFollow);
                 if (config.AutoFollow) autoFollow.Authorize(); else StopFollowing("Automatic following disabled");
@@ -167,6 +178,19 @@ public sealed partial class Plugin : IDalamudPlugin
 
     private unsafe object Dispatch(Request r)
     {
+        if (r.Method == "rhythm_configure") {
+            if (r.Text is not ("on" or "off" or "pad" or "keyboard" or "piano" or "tap"))
+                throw new InvalidOperationException("Rhythm configuration accepts on, off, pad, keyboard, piano or tap; it never casts");
+            RhythmCommand("rhythm " + r.Text);
+            return new { enabled = config.RhythmEnabled, state = rhythm.State.ToString() };
+        }
+        if (r.Method == "rhythm_status") return new {
+            enabled = config.RhythmEnabled, state = rhythm.State.ToString(), controller = config.RhythmController,
+            source = rhythmMusic, bpm = rhythmClock.Bpm, musicFresh = rhythmClock.MusicFresh(RhythmNow),
+            rhythm.Score, rhythm.Hits, rhythm.Misses, rhythm.Combo, rhythm.Cursor,
+            target = rhythm.Target?.Phrase, queued = rhythmQueued, inputMode = weave.InputMode,
+            playbackPaused = weave.Paused, runeCount = weave.Runes.Count, padOwned = RhythmPadOwned,
+        };
         if (r.Method is "compiled" or "translated") {
             if (r.RequestId != draftRequest || weave.DraftRevision != draftRequestRevision || !weave.InputMode) return new { discarded = true };
             draftRequest = null;
@@ -370,6 +394,7 @@ public sealed partial class Plugin : IDalamudPlugin
 
     private void Draw()
     {
+        DrawRhythm();
         DrawSpellEditor();
         if (!visible) return;
         ImGui.SetNextWindowSize(new Vector2(410, 360), ImGuiCond.FirstUseEver);
@@ -439,6 +464,7 @@ public sealed partial class Plugin : IDalamudPlugin
             pad?.Dispose();
             actionEffects?.Dispose();
             keyboard.Dispose();
+            rhythmSound.Dispose();
             hudController?.Dispose();
             if (hudStartup?.IsCompletedSuccessfully == true) KamiToolKit.KamiToolKitLibrary.Dispose();
             else if (hudStartup != null) _ = hudStartup.ContinueWith(t => { if (t.IsCompletedSuccessfully) _ = KamiToolKit.KamiToolKitLibrary.DisposeAsync(); });

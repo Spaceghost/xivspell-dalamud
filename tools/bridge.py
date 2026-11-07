@@ -415,7 +415,7 @@ def main():
     parser.add_argument('--container', help='Run transport beside the game inside this Incus container')
     parser.add_argument('--config')
     parser.add_argument('--deck', type=Path, default=ROOT / 'cards')
-    parser.add_argument('command', choices=['worker', 'rpc', 'tool', 'catalogue', 'snapshot', 'cast', 'follow', 'unfollow', 'disarm', 'cards', 'events', 'feedback', 'input', 'compiled', 'translated', 'cast_result', 'target', 'speech', 'speech_state', 'editor_result', 'editor_open', 'editor_command', 'visuals', 'command_result', 'generate', 'mcp'])
+    parser.add_argument('command', choices=['worker', 'rpc', 'tool', 'catalogue', 'snapshot', 'cast', 'follow', 'unfollow', 'disarm', 'cards', 'events', 'feedback', 'input', 'compiled', 'translated', 'cast_result', 'target', 'speech', 'speech_state', 'editor_result', 'editor_open', 'editor_command', 'visuals', 'command_result', 'rhythm_status', 'rhythm_configure', 'generate', 'mcp'])
     parser.add_argument('payload', nargs='?', default='{}')
     args = parser.parse_args()
     try:

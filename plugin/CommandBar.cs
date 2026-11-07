@@ -101,6 +101,7 @@ public sealed partial class Plugin
     }
     private void StartPlayback(bool restart = false)
     {
+        SuspendRhythm();
         autoFollow.Authorize();
         // A stale Enter-to-compose request must not reclaim the keyboard on
         // the frame after an explicit . or > command.
@@ -148,11 +149,12 @@ public sealed partial class Plugin
             hud.IsVisible = available;
             keyboard.Install();
             keyboard.Enabled = available;
-            if (!available) { ReadController(false); keyboard.PollBackspace(Environment.TickCount64, false); InterruptWeave("Spellcasting suspended"); lastPlayerPosition = null; return; }
+            if (!available) { SuspendRhythm(); ReadController(false); keyboard.PollBackspace(Environment.TickCount64, false); InterruptWeave("Spellcasting suspended"); lastPlayerPosition = null; return; }
             GetWindowThreadProcessId(GetForegroundWindow(), out var foreground);
             var focused = foreground == (uint)Environment.ProcessId;
             var otherText = editorOpen || RaptureAtkModule.Instance()->IsTextInputActive() || Dalamud.Bindings.ImGui.ImGui.GetIO().WantTextInput || visible;
             keyboard.Enabled = focused && !otherText;
+            UpdateRhythm(focused && !otherText);
             keyboard.Capture = weave.InputMode;
             keyboard.PollBackspace(Environment.TickCount64, (GetAsyncKeyState(0x08) & 0x8000) != 0 &&
                 (GetAsyncKeyState(0x11) & 0x8000) == 0 && (GetAsyncKeyState(0x12) & 0x8000) == 0, weave.Draft.Length > 0);
@@ -191,8 +193,9 @@ public sealed partial class Plugin
             }
             if (!weave.Paused && (weave.InFlight != null || !weave.Finished)) CheckEncounterTarget();
             ReadController(focused && !otherText);
+            TickRhythm();
             if (focused && !otherText && !composer.Active && now - lastRuntimePoll < 3000) TryAutomaticFollow(now);
-            if (focused && !otherText && !composer.Active && now >= retryAt && (GetAsyncKeyState(0x08) & 0x8000) == 0 && Environment.TickCount64 - lastRuntimePoll < 3000 && !player.IsCasting && weave.Next is { } next) {
+            if (focused && !otherText && !composer.Active && !rhythm.Active && now >= retryAt && (GetAsyncKeyState(0x08) & 0x8000) == 0 && Environment.TickCount64 - lastRuntimePoll < 3000 && !player.IsCasting && weave.Next is { } next) {
                 var card = cards.FirstOrDefault(c => c.Id == next.CardId);
                 // card.Action is an icon preview. Only the Lua-selected action
                 // may determine resource, target, movement and recast readiness.
@@ -220,6 +223,7 @@ public sealed partial class Plugin
     private void ReadWeaveKeyboard()
     {
         while (keyboard.Events.TryDequeue(out var input)) {
+            if (RhythmKeyboard(input)) continue;
             switch (input.Type) {
                 case SpellKeyboard.Kind.Escape: CardInput("cancel", "voice"); composer.Active = false; InterruptWeave("Interrupted", true); break;
                 case SpellKeyboard.Kind.Movement: MovementControl(); break;

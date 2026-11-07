@@ -148,7 +148,9 @@ spell.busy = true
 assert(spell.invoke('ruin', 0, 'weave-restarted-ticket'))
 assert(restartRequests == 0, 'restart waits for cancelled request result to settle')
 spell.busy = false
-assert(vim.wait(500, function() return restartRequests == 1 end), 'restart proceeds after pending result settles')
+-- The retry itself is 80ms, but a cold source/log write can hold the host's
+-- event loop longer. Stay below the runtime's three-second retry deadline.
+assert(vim.wait(2000, function() return restartRequests == 1 end), 'restart proceeds after pending result settles')
 local eventReads, syncs, afters = 0, 0, {}
 spell.transport = function(method, payload, cb)
   if method == 'events' then

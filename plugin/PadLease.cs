@@ -1,7 +1,7 @@
 namespace XivSpell;
 
 public readonly record struct GrimoirePadSample(ulong Source, uint Held,
-    float LeftX, float LeftY, float RightX, float RightY, bool ExtraButtonsNeutral = true)
+    float LeftX, float LeftY, float RightX, float RightY, bool ExtraButtonsNeutral = true, long InputTime = 0)
 {
     public bool Valid => Source != 0 && (Held & ~0xFFFFu) == 0
         && float.IsFinite(LeftX) && float.IsFinite(LeftY) && float.IsFinite(RightX) && float.IsFinite(RightY)
@@ -15,7 +15,7 @@ public readonly record struct GrimoirePadFilter(bool All, uint Buttons);
 /// <summary>Versioned IPC value. Buttons use the native directional/face/shoulder
 /// mask; sticks are normalized to [-1,1], with negative Y pointing up.</summary>
 public readonly record struct GrimoirePadFrame(int Version, string Phase, ulong Sequence,
-    uint Held, uint Pressed, uint Released, float LeftX, float LeftY, float RightX, float RightY, ulong Session = 1);
+    uint Held, uint Pressed, uint Released, float LeftX, float LeftY, float RightX, float RightY, ulong Session = 1, long InputTime = 0);
 
 /// <summary>One focused XivHud feature owns the pad only through a fresh UI lease.
 /// Call under the broker's lock. No game globals, input injection or native pointers.</summary>
@@ -29,6 +29,7 @@ public sealed class GrimoirePadLease : IDisposable
     private double deadline, lastTime = double.NaN, lastPoll = double.NaN;
     private GrimoirePadSample sample;
     private uint pressed, released, drain;
+    private long inputTime;
     private int neutralPolls;
     private bool disposed;
     private readonly ulong session;
@@ -94,6 +95,7 @@ public sealed class GrimoirePadLease : IDisposable
             if (neutralPolls >= 2) phase = Phase.Active;
             return new(true, 0xFFFF);
         }
+        if ((next.Held & ~sample.Held) != 0 && pressed == 0) inputTime = next.InputTime;
         pressed |= next.Held & ~sample.Held;
         released |= sample.Held & ~next.Held;
         sample = next;
@@ -109,8 +111,8 @@ public sealed class GrimoirePadLease : IDisposable
             return new(1, phase.ToString(), sequence, 0, 0, 0, 0, 0, 0, 0, session);
         if (!double.IsFinite(lastPoll) || now - lastPoll > MaximumLeaseSeconds) { Clear(); return null; }
         var frame = new GrimoirePadFrame(1, "Active", sequence, sample.Held, pressed, released,
-            sample.LeftX, sample.LeftY, sample.RightX, sample.RightY, session);
-        pressed = released = 0;
+            sample.LeftX, sample.LeftY, sample.RightX, sample.RightY, session, inputTime);
+        pressed = released = 0; inputTime = 0;
         return frame;
     }
 
@@ -132,6 +134,6 @@ public sealed class GrimoirePadLease : IDisposable
     private void Clear()
     {
         phase = Phase.None; owner = null; generation = source = 0;
-        sample = default; pressed = released = drain = 0; neutralPolls = 0; lastPoll = double.NaN;
+        sample = default; pressed = released = drain = 0; inputTime = 0; neutralPolls = 0; lastPoll = double.NaN;
     }
 }
