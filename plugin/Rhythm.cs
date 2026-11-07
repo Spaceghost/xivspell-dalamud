@@ -204,6 +204,7 @@ public static class RhythmHands
     public static int Hand(RhythmRound.Note note, bool controller) => controller ? note.Lane / 4 :
         note.Letter == ' ' ? note.LetterIndex % 2 : Left.Contains(note.Letter) ? 0 : 1;
     public static string Button(int index) => index switch { 0 => "←", 1 => "↑", 2 => "↓", 3 => "→", 4 => "□", 5 => "△", 6 => "×", 7 => "○", _ => "?" };
+    public static string ButtonName(int index) => index switch { 4 => "□/X",5 => "△/Y",6 => "×/A",7 => "○/B",_=>Button(index) };
     public static float Alignment(RhythmRound.Note note, bool controller)
     {
         if (controller) return note.Lane % 4 switch { 0 => .15f, 3 => .85f, _ => .5f };
@@ -213,5 +214,5 @@ public static class RhythmHands
         }
         return .5f;
     }
-    public static string Prompt(RhythmRound.Note note, bool controller) => controller ? Button(note.Lane) : note.Letter == ' ' ? "SPACE" : char.ToUpperInvariant(note.Letter).ToString();
+    public static string Prompt(RhythmRound.Note note, bool controller) => controller ? ButtonName(note.Lane) : note.Letter == ' ' ? "SPACE" : char.ToUpperInvariant(note.Letter).ToString();
 }

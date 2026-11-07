@@ -61,7 +61,7 @@ Check(!weave.InputMode && weave.Next?.CardId == "ruin", "Explicit continuation k
 var keyboardLeft = new RhythmRound.Note('r',0,[],1,0);
 var keyboardRight = keyboardLeft with { Letter='u' };
 Check(RhythmHands.Hand(keyboardLeft,false)==0 && RhythmHands.Hand(keyboardRight,false)==1,"Keyboard notes follow physical left/right hand groups");
-Check(RhythmHands.Hand(keyboardLeft with { Lane=7 },true)==1 && RhythmHands.Prompt(keyboardLeft with { Lane=7 },true)=="○","Controller notes show the exact physical button and hand");
+Check(RhythmHands.Hand(keyboardLeft with { Lane=7 },true)==1 && RhythmHands.Prompt(keyboardLeft with { Lane=7 },true)=="○/B","Controller notes show the exact physical button and hand on PS and Xbox layouts");
 Check(RhythmHands.Alignment(keyboardLeft,false)>RhythmHands.Alignment(keyboardLeft with { Letter='q' },false),"Letters align to keyboard columns within each hand");
 r.Start(deck[0],deck,10,.5,[10,10.4,11,11.7]);
 Check(r.Notes[3].Due==11.7,"Future song onsets supply note timing instead of a guessed uniform grid");

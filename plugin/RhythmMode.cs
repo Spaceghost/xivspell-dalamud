@@ -178,6 +178,9 @@ public sealed partial class Plugin
             } catch { /* Piano is optional; never start, pause or change its volume. */ }
             rhythmMusic = rhythmSongChart && songReady ? "Piano · future song chart" : rhythmClock.MusicFresh(now) ? rhythmClock.Source+" · tempo guide" : "Piano unavailable / paused · tempo guide";
         } else if (!config.RhythmUsePiano) rhythmMusic = rhythmClock.Source;
+        if (!rhythmSongChart && rhythm.Active && rhythm.Cursor==0 && rhythm.Hits==0 && MusicTimes(rhythm.Notes.Length)!=null) {
+            rhythm.Stop();BeginRhythm();
+        }
         rhythm.LatencyMs = config.RhythmLatencyMs;
     }
     private void TickRhythm()

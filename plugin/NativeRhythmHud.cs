@@ -19,7 +19,7 @@ internal sealed class NativeRhythmHud : OverlayNode
     protected override void OnUpdate() { }
     private static readonly Vector4 Gold = new(1,.89f,.61f,1), Ice = new(.82f,.97f,1,1);
     private static readonly Vector4[] Hands = [new(.45f,.94f,.89f,1),new(1,.65f,.82f,1)];
-    private readonly ColorImageNode[] road = new ColorImageNode[64], edges = new ColorImageNode[96];
+    private readonly ColorImageNode[] road = new ColorImageNode[64], edges = new ColorImageNode[3];
     private readonly ColorImageNode[] notes = new ColorImageNode[40], glows = new ColorImageNode[40];
     private readonly TextNode[] prompts = new TextNode[40], spellLetters = new TextNode[40];
     private readonly ColorImageNode[] strike = new ColorImageNode[2];
@@ -91,13 +91,17 @@ internal sealed class NativeRhythmHud : OverlayNode
                 node.Position=new(width/2+(hand-1)*half,y); node.Size=new(half,nextY-y+1);
                 node.Alpha=.16f+.1f*t;
             }
-            for (var edge=0;edge<3;edge++) {
-                var node=edges[row*3+edge];node.Position=new(width/2+(edge-1)*half,y);
-                node.Size=new(edge==1 ? 1 : 2,nextY-y+1);node.Alpha=.12f+.45f*t;
-            }
         }
         var bottom = top+height;
         var laneWidth=width*.42f;
+        for (var edge=0;edge<3;edge++) {
+            var start=new Vector2(width/2+(edge-1)*horizon/2,top);
+            var end=new Vector2(width/2+(edge-1)*laneWidth,bottom);
+            var delta=end-start;
+            edges[edge].Position=start;edges[edge].Size=new(edge==1 ? 1 : 2,delta.Length());
+            edges[edge].RotationDegrees=-MathF.Atan2(delta.X,delta.Y)*180/MathF.PI;
+            edges[edge].Alpha=edge==1 ? .2f : .55f;
+        }
         for (var hand=0;hand<2;hand++) {
             var left=width/2+(hand-1)*laneWidth;
             strike[hand].Position=new(left+3,bottom);strike[hand].Size=new(laneWidth-6,3);
@@ -134,7 +138,7 @@ internal sealed class NativeRhythmHud : OverlayNode
             prompts[slot].FontSize=(uint)Math.Clamp(32*scale,12,36);prompts[slot].String=label;prompts[slot].TextColor=Hands[hand];
             spellLetters[slot].Position=new(x-keyWidth/2+4*scale,y+17*scale);spellLetters[slot].Size=new(keyWidth+24,24);
             spellLetters[slot].FontSize=(uint)Math.Clamp(15*scale,10,17);
-            spellLetters[slot].String=controller ? (note.Letter==' ' ? "SPACE" : char.ToUpperInvariant(note.Letter).ToString()) : "";
+            spellLetters[slot].String=controller ? "type "+(note.Letter==' ' ? "SPACE" : char.ToUpperInvariant(note.Letter).ToString()) : "";
             slot++;
         }
         for (;slot<notes.Length;slot++) glows[slot].IsVisible=notes[slot].IsVisible=prompts[slot].IsVisible=spellLetters[slot].IsVisible=false;
