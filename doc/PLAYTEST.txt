@@ -1,0 +1,80 @@
+Grimoire playtest handoff — 2026-10-31
+
+Current evidence
+
+The live character is Arcanist 20, outside a duty. Sastasha is duty id 4,
+requires level 15 and syncs to 18. All 13 action IDs used by the 14-card starter
+deck have required levels at or below 18. This verifies level compatibility;
+the game still checks learning, summon/gauge state, resources and cooldowns.
+Duty entry/unlock eligibility has not been established by these sheet rows.
+
+Ruin 1; Carbuncle/Aegis 2; Physick 4; Aethercharge/Ruby/Gemshine 6;
+Energy Drain/Fester 10; Resurrection 12; Lucid Dreaming 14; Topaz 15;
+Swiftcast 18. These levels came from get_action in the running game.
+
+At the last deployment, the existing 20-rune weave was preserved, paused at
+cursor 2. Do not clear it as part of setup. The Lua runtime retained two
+stateful cards and 11 recorded attempts during the last update. These are
+observations, not a duty
+completion claim. The companion playtest-readiness.json contains the filtered
+live job, duty and action-row evidence without character identity.
+
+Already exercised
+
+Native floating text becomes spell icons; names, expansions and Tab completion
+were player-tested. Live Physick and Aegis requests worked in earlier tests.
+Clicking the native Physick icon opened its matching Lua buffer in the real
+Neovim with LuaLS attached, paused playback and retained the queue cursor.
+The compact Lua preview was inspected in a game screenshot.
+
+State-machine and Lua tests cover immediate dot/continuation, retained drafts,
+Escape, movement retry, confirmed casts, target boundaries and stale results.
+The latest macro tests retain one evaluated action and one before_cast hook
+through a simulated 60-second cooldown, commit only on confirmation and stop
+on cancellation. Native compilation and Lua analysis pass.
+
+Actual LuaLS completion was checked for context, hook payloads, card metadata
+and all 172 upstream tools. A live additive MCP session exposed 185 tools and
+completed concurrent game/source reads. Transport tests cover shared session
+identity, response correlation, late results and ordered atomic source saves.
+
+Next outdoor pass
+
+1. Check the header after pressing . by itself: CONTROL must remain visible,
+   including if a missing target pauses playback. No Enter is required.
+   Esc explicitly pauses; i returns to WEAVE without resetting the saved line.
+
+2. Select an enemy you intend to fight and start or resume your existing weave.
+   With automatic follow enabled, an out-of-range role target should be
+   approached. Move to take control, then stop: cast retries may continue, but
+   automatic movement must remain revoked until explicit i, . or >.
+   /xivspell autofollow off disables automatic starts persistently.
+
+3. During a cast, move and then stop. A spell interrupted by movement should
+   retry its retained step. A successful slidecast must spend that step once.
+   Esc must stay paused despite later movement; > explicitly resumes.
+
+4. Hover a rune, then click it. Confirm the preview and Neovim buffer refer to
+   that spell. Save an intentional small edit in Neovim and inspect the updated
+   preview. Opening/editing source must not cast or restart the paused queue.
+
+First duty pass
+
+When the player is ready and Sastasha is available, use the familiar starter
+deck for a short section, checking the same controls between encounters.
+An ended or changed enemy must pause the next step until explicit continuation.
+Observe a programmed burst-next step on cooldown: its selected action should
+remain stable while waiting, and its macro step should advance only after the
+cast is confirmed. Record the key sequence and HUD hint for any failure.
+
+Then complete a duty using the typing workflow and revise one spell program
+based on the run. Completion with this typing workflow has not been verified.
+
+Open requirements
+
+Post-fix player confirmation of the dot/mode path is pending. Automatic follow
+has passed authorization tests and paused-state checks, but live approach and
+takeover are not yet player-confirmed. Healer ally/focus/tank behavior requires
+a healer playtest; the current Arcanist cannot establish it. Controller casting
+was explicitly deferred by the player and remains unresolved in the full goal.
+The full programmer-play experience is not marked complete by these checks.

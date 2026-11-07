@@ -1,0 +1,4 @@
+#!/bin/sh
+XIVSPELL_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+export XIVSPELL_ROOT
+exec nvim -u "$XIVSPELL_ROOT/tools/start.lua" "$@"

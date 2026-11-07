@@ -1,0 +1,12 @@
+{
+  "Author": "spaceghost",
+  "Name": "XivSpell — Lua spellbook",
+  "InternalName": "XivSpell",
+  "RepoUrl": "https://github.com/Spaceghost/xivspell-dalamud",
+  "AssemblyVersion": "0.1.0.1",
+  "Punchline": "Weave words into spells.",
+  "Description": "A native spell-weaving HUD. Type names into animated spell icons and stacked queues. Escape controls your character; i weaves, . repeats and > continues. Neovim edits the Lua spellcards.",
+  "ApplicableVersion": "any",
+  "DalamudApiLevel": 15,
+  "Tags": ["lua", "neovim", "spellbook"]
+}

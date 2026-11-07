@@ -1,0 +1,10 @@
+plugin/bin/
+plugin/obj/
+__pycache__/
+.playtest/
+cards/.history/
+doc/tags
+tests/weave/bin/
+tests/weave/obj/
+.dalamud/
+release/

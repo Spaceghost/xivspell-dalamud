@@ -1,0 +1,11 @@
+[Unit]
+Description=Local speech recognition for Grimoire
+
+[Service]
+ExecStart=%h/.local/libexec/xivspell/whisper-server --host 127.0.0.1 --port 41808 -m %h/.local/share/xivspell/whisper/ggml-tiny.en.bin -t 4 -ng -nt --prompt "Grimoire, Ruin, Physick, Radiant Aegis, nearest enemy, nearest mob, target, self, tank, healer, if then else."
+Restart=on-failure
+RestartSec=3
+WorkingDirectory=%h/.local/share/xivspell/whisper
+
+[Install]
+WantedBy=default.target

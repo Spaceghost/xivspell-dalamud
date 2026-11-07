@@ -1,0 +1,119 @@
+---@meta
+---@alias SpellTarget 'current'|'self'|'focus'|'targetOfTarget'|'tank'|'healer'|'lowest'|'role'|'party1'|'party2'|'party3'|'party4'|'party5'|'party6'|'party7'|'party8'|string
+---@class SpellContext
+---@field state table<string, any> Persistent per-card state; advances after an accepted request or practice cast.
+---@field target SpellTarget Default target of this card.
+---@field actions SpellActions Action IDs from the live game data.
+---@field xiv XivApi The full typed MCP API. Functions accept arguments and an asynchronous callback.
+---@field snapshot SpellSnapshot Most recent native game snapshot (about 80ms polling).
+local Context = {}
+---Request one action for this invocation. The game checks cooldowns, resources and target validity.
+---@param action integer
+---@param target? SpellTarget
+function Context:cast(action, target) end
+---Advance one step of a programmed macro per human invocation. Rejected requests retain the current step.
+---@param steps (integer|{action: integer, target?: SpellTarget})[]
+function Context:sequence(steps) end
+---@class SpellCard
+---@field id? string Assigned from the source filename when loaded.
+---@field path? string Assigned source path when loaded.
+---@field source? string Loaded Lua source for the spell preview.
+---@field name string Display title on the game icon and editor card.
+---@field action integer Preview action icon ID.
+---@field target? SpellTarget
+---@field phrase string Exact text to type in challenge mode.
+---@field command? string Spell name in the command line; defaults to phrase.
+---@field aliases? string[] Alternate spell names.
+---@field run fun(ctx: SpellContext)
+---@class SpellUserConfig
+---@field expansions? table<string, string> Short names expanded with Tab or Enter.
+---@field hooks? SpellHookHandlers Named lifecycle handlers; before hooks may cancel.
+---@class SpellSnapshot
+---@field playerName? string
+---@field job? integer
+---@field level? integer Current synced level.
+---@field role? integer Game ClassJob role; 4 means healer.
+---@field hp? integer
+---@field maxHp? integer
+---@field mp? integer
+---@field isCasting? boolean
+---@field targetId? integer
+---@field targetName? string
+---@field focusId? integer
+---@field focusName? string
+---@field targetHp? integer
+---@field targetMaxHp? integer
+---@field focusHp? integer
+---@field focusMaxHp? integer
+---@field maxMp? integer
+---@field armed boolean
+---@field following boolean
+---@field autoFollow boolean Whether live weaves automatically start role-aware following.
+---@field autoFollowAuthorized boolean Movement or explicit stops revoke this until i, . or >.
+---@field followTarget string
+---@field message string
+---@alias SpellMode 'practice'|'live'
+---@class SpellIntent
+---@field action integer
+---@field target SpellTarget
+---@field requestId? string
+---@class SpellBeforeCast
+---@field card SpellCard
+---@field intent SpellIntent Mutable action request, before dispatch.
+---@field context SpellContext
+---@field mode SpellMode
+---@class SpellTyping
+---@field input string Raw text entered in the native bar.
+---@field seconds number
+---@field wpm integer
+---@field repeatCommand boolean
+---@class SpellCastResult
+---@field accepted? boolean Whether the game accepted the request; not proof of landed damage/healing.
+---@field pending? boolean Waiting for the submitted cast's server confirmation.
+---@field retry? boolean Known temporary rejection; no action was submitted, or confirmed movement interruption.
+---@field practice? boolean
+---@field action? integer Adjusted action ID.
+---@field status? integer Game action status code observed before submission.
+---@field target? string
+---@field message? string
+---@class SpellAttempt
+---@field card string Card ID.
+---@field time string UTC timestamp.
+---@field mode SpellMode
+---@field action integer
+---@field target SpellTarget
+---@field step? integer Sequence step.
+---@field typing? SpellTyping
+---@field latencyMs? number
+---@field result? SpellCastResult
+---@field error? string
+---@class SpellRpcEvent
+---@field command string Native bridge operation, or tool for an MCP call.
+---@field arguments table
+---@field result? any
+---@field error? string
+---@field latencyMs? number
+---@class SpellHookHandlers
+---@field session_start? fun(event: {deck: string})
+---@field session_end? fun(event: table)
+---@field before_compile? fun(event: {path: string})
+---@field after_compile? fun(event: {path: string, card: SpellCard})
+---@field deck_loaded? fun(event: {cards: SpellCard[], errors: string[]})
+---@field buffer_saved? fun(event: {path: string})
+---@field before_parse? fun(event: {text: string, card?: SpellCard}): boolean|nil
+---@field after_parse? fun(event: {text: string, card?: SpellCard})
+---@field expand? fun(event: {from: string, to: string})
+---@field repeat? fun(event: {command: string})
+---@field before_cast? fun(event: SpellBeforeCast): boolean|nil
+---@field after_cast? fun(event: SpellAttempt)
+---@field cast_rejected? fun(event: SpellAttempt)
+---@field bridge_error? fun(event: SpellAttempt|table)
+---@field snapshot? fun(event: SpellSnapshot)
+---@field target_changed? fun(event: SpellSnapshot)
+---@field mode_changed? fun(event: {mode: SpellMode})
+---@field follow_started? fun(event: SpellSnapshot|table)
+---@field follow_stopped? fun(event: SpellSnapshot)
+---@field controller_override? fun(event: SpellSnapshot)
+---@field mcp_before? fun(event: SpellRpcEvent): boolean|nil
+---@field mcp_after? fun(event: SpellRpcEvent)
+

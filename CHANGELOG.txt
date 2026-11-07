@@ -1,0 +1,111 @@
+2026-10-31 / readiness belongs to Lua-selected actions
+
+Preview icons no longer gate execution of custom conditional programs.
+Lua selects the actual action/target once; known pre-submission cooldown,
+animation and relocation waits retain that intent without rerunning card
+code or hooks. Server-confirmation timeouts start at submission rather than
+including cooldown time. Explicit cancellation still invalidates the ticket.
+
+2026-10-31 / concurrent additive MCP
+
+Slow mod requests no longer block unrelated spellbook reads or MCP ping.
+Four workers share one upstream session and correlate responses by request ID,
+preserving approval/ticket ownership. Late responses cannot satisfy newer
+requests and timed-out actions are never automatically replayed.
+Source saves remain ordered and use atomic file replacement;
+owned transport workers close when the server exits. Live tool schemas were
+compared with the generated API: all 172 still match.
+
+2026-10-31 / automatic role follow for live weaves
+
+Live weaving starts role-aware following without a separate follow command.
+Movement, Escape, explicit stop and editing revoke automatic movement until
+i, . or >. Existing manual selections are respected. Mesh loading retries
+are limited to once per second; missing navigation never blocks casting.
+/xivspell autofollow on/off persists the automatic-start preference.
+
+2026-10-31 / source-bound native runes
+
+Native weave icons now show Lua source previews on hover and open their card's
+buffer in the existing Neovim on click. Clicking pauses the weave at its current
+step. Only the icons register native mouse interaction; surrounding text and
+the feathered veil remain transparent to scene clicks.
+
+2026-10-31 / native command to Neovim source
+
+:nvim SPELL opens the matching loaded card buffer in the existing Neovim
+session through asynchronous local RPC. Unsaved buffers are reused; saving
+uses the existing deck watcher. Missing/busy editors report a bounded failure
+without blocking the casting runtime. Native Tab completion supports :nvim.
+
+2026-10-31 / clearer native construction
+
+The native header shows input mode and pause state independently. Spell stacks
+share a single target detail line instead of repeating actor names under every
+icon. Compact rune spacing, a stronger feathered ink veil and fewer duplicate
+instructions make the construction easier to read over bright terrain.
+
+2026-10-31 / typed mod hook registrations
+
+Direct .on registrations infer typed payloads for all 22 built-in lifecycle
+events. Loaded card id/path/source metadata is included in LuaLS definitions.
+Real completion checks cover before_cast, nested card fields and MCP events.
+
+2026-10-31 / living follow targets
+
+Follow requests and active routes now reject defeated or untargetable actors
+and yourself. Healer role mode skips an unavailable focus and searches for a
+living party tank instead. Movement takeover and cast holds are unchanged.
+
+2026-10-31 / Lua completion across the spell workshop
+
+Attach LuaLS to personal expansions/hooks in grimoire.lua and mod modules in
+lua/, as well as card files. Existing open Lua buffers attach during setup.
+Directory matching respects path boundaries rather than substring matches.
+
+2026-10-31 / preserve command mode and automatic relocation
+
+Restore movement as a temporary relocation pause rather than a hard stop.
+Movement releases the keyboard to character control while retaining live
+playback and its current spell; casts retry automatically once still. Escape
+remains an explicit playback stop. Dot and > now explicitly enter CONTROL
+from either input mode, without Enter; i explicitly returns to composition.
+Regression tests lock down this mode/playback separation, stale results,
+slidecasting, relocation retries, and saved-step restoration.
+
+2026-10-31 / compact native spell HUD
+
+A confirmed spell is consumed before an explicit interruption; late cancelled
+results remain ignored.
+The native HUD uses a smaller footprint, contextual instructions and a feathered
+ink veil for contrast over bright terrain. Rendering remains native game UI.
+Plugin unloading no longer synchronously waits on the framework thread, and
+native chat cleanup is marshalled onto that thread. These changes build and
+pass host tests. The player-approved restart recovered the old stuck unload;
+the updated plugin is loaded and subsequent reloads completed successfully.
+
+2026-10-30 / native spell weaving
+
+Replace the gameplay textbox with a KamiToolKit native HUD: floating draft
+letters, animated spell icons, stacked queues and current-rune highlights.
+Completed names and expansions tokenize without Enter. Native character
+events preserve fast keystrokes. Escape interrupts and switches to character
+control; i returns to weaving. Dot repeats the stack; > resumes its cursor.
+Movement pauses, late results cannot advance interrupted queues, and cancelled
+request IDs are refused before a delayed Lua action can reach the game.
+
+2026-10-29 / 0.1.0 beta
+
+Native spell command bar in the player casting area, with spell-name Tab
+completion, expansions, macros, dot repeat, and source-bound game icons.
+Neovim is the Lua editor; an independent user service hosts spell programs.
+Starter Arcanist deck uses action IDs queried from the running game.
+Generated LuaLS definitions cover the live 172-tool XivMcp catalogue.
+An additive stdio MCP server adds 13 spellbook tools; persistent workers avoid
+starting a process for every action. Typed lifecycle hooks support extensions.
+
+Player playtest: native input, completion, expansions, repetition and live casts
+worked. The game accepted Radiant Aegis and Physick requests, with observed
+request times of 30–36 ms. Controller casting remains under investigation;
+cross-hotbar bindings are present and Dalamud controller interception is off.
+Role-aware vnavmesh following is implemented but not yet playtested.

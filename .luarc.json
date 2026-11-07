@@ -1,0 +1,10 @@
+{
+  "runtime.version": "LuaJIT",
+  "runtime.path": ["lua/?.lua", "lua/?/init.lua", "?.lua", "?/init.lua"],
+  "runtime.pathStrict": true,
+  "workspace.library": ["api", "lua"],
+  "workspace.checkThirdParty": false,
+  "completion.maxSuggestCount": 1000,
+  "diagnostics.globals": ["vim", "actions"],
+  "telemetry.enable": false
+}

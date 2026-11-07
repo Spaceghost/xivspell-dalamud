@@ -1,0 +1,40 @@
+name: Build and test
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          global-json-file: global.json
+      - name: Install Neovim
+        run: |
+          curl --fail --location --retry 3 https://github.com/neovim/neovim/releases/download/v0.11.4/nvim-linux-x86_64.tar.gz -o "$RUNNER_TEMP/nvim.tar.gz"
+          tar -xzf "$RUNNER_TEMP/nvim.tar.gz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/nvim-linux-x86_64/bin" >> "$GITHUB_PATH"
+      - name: Offline tests
+        run: tools/test.sh
+      - name: Fetch API 15 references
+        run: |
+          curl --fail --location --retry 3 https://raw.githubusercontent.com/goatcorp/dalamud-distrib/3e8e6eb456c928401febd1d9452c4b8d4cad0eb5/latest.zip -o "$RUNNER_TEMP/dalamud.zip"
+          mkdir .dalamud
+          unzip -q "$RUNNER_TEMP/dalamud.zip" -d .dalamud
+      - name: Build native plugin
+        env:
+          DALAMUD_HOME: ${{ github.workspace }}/.dalamud
+        run: dotnet build plugin/XivSpell.csproj -c Release -p:RestoreLockedMode=true
+      - name: Package plugin and companion source
+        run: tools/package.sh
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: xivspell-development
+          path: release/

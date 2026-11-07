@@ -1,0 +1,150 @@
+{
+  "job": {
+    "id": 26,
+    "abbreviation": "ACN",
+    "name": "arcanist",
+    "role": "magicalRanged"
+  },
+  "level": 20,
+  "syncedLevel": null,
+  "duty": {
+    "inDuty": false,
+    "isDutyStarted": false,
+    "isCompleted": false
+  },
+  "duties": [
+    {
+      "id": 4,
+      "name": "Sastasha",
+      "type": "Dungeons",
+      "level": 15,
+      "itemLevelRequired": 0,
+      "levelSync": 18,
+      "itemLevelSync": 0,
+      "partySize": 4,
+      "highEnd": false,
+      "pvp": false
+    },
+    {
+      "id": 28,
+      "name": "Sastasha (Hard)",
+      "type": "Dungeons",
+      "level": 50,
+      "itemLevelRequired": 80,
+      "levelSync": 50,
+      "itemLevelSync": 0,
+      "partySize": 4,
+      "highEnd": false,
+      "pvp": false
+    }
+  ],
+  "actions": [
+    {
+      "key": "ruin",
+      "id": 163,
+      "name": "Ruin",
+      "level": 1,
+      "isPlayerAction": true,
+      "isPvp": false
+    },
+    {
+      "key": "carbuncle",
+      "id": 25798,
+      "name": "Summon Carbuncle",
+      "level": 2,
+      "isPlayerAction": true,
+      "isPvp": false
+    },
+    {
+      "key": "aegis",
+      "id": 25799,
+      "name": "Radiant Aegis",
+      "level": 2,
+      "isPlayerAction": true,
+      "isPvp": false
+    },
+    {
+      "key": "physick",
+      "id": 16230,
+      "name": "Physick",
+      "level": 4,
+      "isPlayerAction": true,
+      "isPvp": false
+    },
+    {
+      "key": "charge",
+      "id": 25800,
+      "name": "Aethercharge",
+      "level": 6,
+      "isPlayerAction": true,
+      "isPvp": false
+    },
+    {
+      "key": "ruby",
+      "id": 25802,
+      "name": "Summon Ruby",
+      "level": 6,
+      "isPlayerAction": true,
+      "isPvp": false
+    },
+    {
+      "key": "gemshine",
+      "id": 25883,
+      "name": "Gemshine",
+      "level": 6,
+      "isPlayerAction": true,
+      "isPvp": false
+    },
+    {
+      "key": "drain",
+      "id": 16508,
+      "name": "Energy Drain",
+      "level": 10,
+      "isPlayerAction": true,
+      "isPvp": false
+    },
+    {
+      "key": "fester",
+      "id": 181,
+      "name": "Fester",
+      "level": 10,
+      "isPlayerAction": true,
+      "isPvp": false
+    },
+    {
+      "key": "topaz",
+      "id": 25803,
+      "name": "Summon Topaz",
+      "level": 15,
+      "isPlayerAction": true,
+      "isPvp": false
+    },
+    {
+      "key": "swift",
+      "id": 7561,
+      "name": "Swiftcast",
+      "level": 18,
+      "isPlayerAction": true,
+      "isPvp": false
+    },
+    {
+      "key": "raise",
+      "id": 173,
+      "name": "Resurrection",
+      "level": 12,
+      "isPlayerAction": true,
+      "isPvp": false
+    },
+    {
+      "key": "lucid",
+      "id": 7562,
+      "name": "Lucid Dreaming",
+      "level": 14,
+      "isPlayerAction": true,
+      "isPvp": false
+    }
+  ],
+  "checkedAtUtc": "2026-10-31T18:11:01.092268+00:00",
+  "evidenceScope": "Live job/duty state and required action levels; not learned-action, duty-unlock, live-follow or duty-completion proof.",
+  "levelCompatibleWithSastashaSync": true
+}

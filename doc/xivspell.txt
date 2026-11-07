@@ -1,0 +1,457 @@
+*xivspell.txt*  Grimoire: a native FFXIV spell command line backed by Lua
+
+GAMEPLAY                                                     *xivspell-play*
+
+Grimoire is a compact native game HUD: floating letters, luminous runes and
+real spell icons. It uses the game's AddonToolKit through KamiToolKit for the
+casting interface. Neovim edits Lua spell programs in the background.
+
+Spell input captures the keyboard automatically. Type a complete spell name,
+card ID, alias or configured expansion; it becomes an icon immediately, with
+no Enter. Keep typing to construct a queue of up to 32 spells. Spaces within
+names work normally. Tab accepts a unique spell-name prefix; Backspace edits
+the unfinished word, then removes the last unstarted icon.
+>
+    ruinphysick          two spell icons
+    radiant aegis        one spell icon
+    ra                   configured expansion
+<
+Escape interrupts the weave and switches to CONTROL mode: WASD and the rest
+of the character controls work normally. Press i to return to WEAVE mode.
+Movement releases the keyboard to CONTROL without stopping playback. Spells
+that need stillness wait and retry when you stop; instant actions can continue
+while moving. Escape is the explicit playback pause and also reaches the
+game's own cast cancellation. The queue retains its current rune.
+
+    .    repeat the constructed weave from its first spell, immediately
+    >    continue from the interrupted spell, immediately
+
+Both shortcuts immediately enter CONTROL mode without Enter, even when used
+while composing. Only i explicitly returns to composing. New spells appended
+while paused wait for >.
+Completed icons dim; the current rune pulses. Short gaps retain the stack;
+a new spell after four idle seconds starts a fresh weave. Dot repeats the
+whole current stack, including stateful Lua macro invocations. A rejected
+action retains its position and macro state until explicit continuation.
+Readiness uses the action selected by Lua, not the card's preview icon. Known
+pre-cast cooldown, animation and movement waits retain the evaluated intent;
+they do not rerun card Lua or before_cast hooks. A confirmed movement
+interruption retains the macro step and retries through the normal weave flow.
+
+Disarming preserves the construction without casting. /xivspell off disarms;
+/xivspell input enables live casting. /xivspell cards opens the source library.
+The native plugin reports whether live casting is enabled. Other plugins'
+text editors and native game text input retain the keyboard; opening one or
+leaving the game pauses the weave. Controller bindings are unchanged.
+
+The game still checks targeting, resources, cooldowns and level sync. Queue
+progress waits for the accepted spell's cast to finish. A successful request
+is not proof the spell landed. A missing result pauses without automatic
+retry: inspect the game before choosing > to avoid repeating an uncertain cast.
+
+Use /xivspell cards for the spell library. Its Type button adds a spell to
+the weave; its icon opens that spell's Lua source in the in-game editor tile.
+Hover a card to inspect its source.
+The native weave icons are also source links: hover for a Lua preview, then
+click an icon to pause the weave and open its buffer in your existing Neovim.
+The surrounding floating text and scene do not claim mouse clicks.
+
+    /xivspell            Show/hide the native spell HUD.
+    /xivspell input      Show the native HUD and enter WEAVE mode.
+    /xivspell cards      Show/hide larger cards with source previews.
+    /xivspell off        Disarm and stop XivSpell-owned following.
+
+EXPANSIONS                                                 *xivspell-expand*
+
+Type an expansion to weave its spell immediately. Card IDs and aliases
+resolve the same way; Tab accepts a unique prefix of a spell name or ID.
+
+Default expansions: ra -> radiant aegis, sc -> summon carbuncle,
+ed -> energy drain, sr -> summon ruby, st -> summon topaz, bn -> burst next.
+
+Edit grimoire.lua for your personal expansions and hooks. The background
+runtime reloads saved changes automatically. From Neovim:
+>
+    :SpellExpand shield radiant aegis
+<
+Saved expansions override defaults. Expansion cycles are rejected. Persistent
+expansions live in Neovim's state directory, xivspell/expansions.json.
+
+LUA SPELLCARDS                                               *xivspell-lua*
+
+Each cards/*.lua buffer returns a SpellCard. A minimum example:
+>
+    ---@type SpellCard
+    return {
+      name = "Ruin",
+      action = actions.ruin,       -- native icon preview
+      target = "current",
+      phrase = "ruin",             -- native command/completion text
+      ---@param ctx SpellContext
+      run = function(ctx)
+        ctx:cast(actions.ruin)
+      end,
+    }
+<
+Targets: current, self, focus, targetOfTarget, party1..party8. Casting on a
+focus or party member does not change your selected enemy target.
+
+ctx:cast(actionId, target?) emits one action request. ctx.state is persistent
+for this card during the runtime session. It commits only after a successful
+practice invocation or an accepted live request. Example:
+>
+    run = function(ctx)
+      ctx:sequence({
+        { action = actions.charge, target = "self" },
+        actions.drain,
+        actions.fester,
+      })
+    end
+<
+Each invocation performs one step. "burst next" + Enter, then ".", then "." is a
+three-input macro, subject to the actual game cooldowns. There is no automatic
+wait, cast loop, or timer in ctx:sequence.
+
+ctx.snapshot contains the latest native HP, MP, synced level, role, target,
+focus and follow state. Its fields have LuaLS definitions in api/context.lua.
+
+ctx.xiv exposes the generated MCP API, including the installed mods exposed
+by XivMcp. It is asynchronous; pass an arguments table and a callback:
+>
+    ctx.xiv.get_player({}, function(player, error)
+      -- player.job, player.hp, ... have generated types.
+    end)
+<
+Ordinary Neovim modules can use require('xiv') for the same API. Upstream tool
+tiers and approvals still apply. PRACTICE specifically rehearses ctx:cast;
+explicit calls to other tools retain those tools' own effects and permissions.
+
+Card definitions have math/string/table helpers, iteration functions and the
+actions table. They do not have shell, file, or global editor access. LuaJIT
+tracing is disabled for card prototypes so the instruction budget can stop a
+Lua loop. Personal hooks in grimoire.lua are ordinary trusted Neovim Lua.
+
+HOOKS                                                      *xivspell-hooks*
+
+grimoire.lua returns a SpellUserConfig. Hook payloads and callbacks are typed
+as SpellHookHandlers; completion works inside the callback, including nested
+event.intent and event.context fields.
+>
+    ---@type SpellUserConfig
+    return {
+      expansions = { heal = "physick" },
+      hooks = {
+        before_cast = function(event)
+          if event.card.name == "Physick" and event.context.snapshot.focusId then
+            event.intent.target = "focus"
+          end
+        end,
+        cast_rejected = function(attempt)
+          -- attempt.result.status and attempt.result.message
+        end,
+      },
+    }
+<
+Return false from before_parse, before_cast or mcp_before to cancel that work.
+Handlers run in registration order; errors are reported without preventing
+the other handlers from running. Each saved config reload replaces its old
+handlers. Other editor modules can register a removable handler:
+>
+    local remove = require('xivspell').on('after_cast', function(attempt) end)
+    remove()
+<
+Available events and payloads:
+
+    session_start       {deck}
+    session_end         {}
+    before_compile      {path}
+    after_compile       {path, card}
+    deck_loaded         {cards, errors}
+    buffer_saved        {path} in the editing Neovim instance
+    before_parse        {text, card?}, mutable; false cancels
+    after_parse         {text, card?}
+    expand              {from, to}
+    repeat              {command}
+    before_cast         SpellBeforeCast; mutate intent, false cancels
+    after_cast          SpellAttempt; practice or accepted game request
+    cast_rejected       SpellAttempt; game returned accepted=false
+    bridge_error        SpellAttempt or operation error
+    snapshot            SpellSnapshot when native state changes
+    target_changed      SpellSnapshot when target/focus IDs change
+    mode_changed        {mode='practice'|'live'}
+    follow_started      SpellSnapshot or follow request result
+    follow_stopped      SpellSnapshot
+    controller_override SpellSnapshot after left-stick takeover
+    mcp_before          SpellRpcEvent; false cancels transport
+    mcp_after           SpellRpcEvent, including latencyMs and result/error
+
+FOLLOWING                                                 *xivspell-follow*
+
+Live weaves automatically start role-aware following when there is a living
+enemy (damage jobs) or ally (healers) and the zone mesh is ready. Movement,
+Escape, stop, editing, loss of
+focus or a lost target revoke automatic movement. Cast retries cannot reclaim
+it: explicitly press i, . or > to re-engage. Casting still pauses owned paths.
+An existing manual follow selection is preserved. /xivspell autofollow off
+disables automatic starts; /xivspell autofollow on enables them. The setting
+persists across reloads. Practice never starts automatic movement.
+
+Through the command API invoke "follow current", "follow focus", "follow party2" or
+"follow role". Type "stop" to stop. PRACTICE describes the request only.
+
+Role mode follows your selected target for damage jobs. A healer follows the
+living, targetable focus, or a living party tank if the focus is unavailable.
+Following cannot target yourself or a defeated character. Damage jobs maintain
+about 15 yalms; role-mode healers maintain about 6. Explicit API callers may
+set 2–25 yalms. The installed vnavmesh supplies walking paths. Casting pauses
+XivSpell's movement. Left-stick movement cancels following. Losing the target,
+death, zoning, disarming or unloading also stops it. No controller buttons are
+remapped. This is following, not encounter-mechanic avoidance.
+
+Cancelled or obsolete pathfinding results cannot start movement later. Stopping
+XivSpell does not stop unrelated vnavmesh routes it did not start.
+
+EDITOR AND LSP                                               *xivspell-lsp*
+
+    :Spellbook          Open the source index; Enter/e edits a Lua buffer.
+    :SpellEdit ruin     Edit a named buffer directly.
+    :SpellSync          Publish current icons, names, expansions and source.
+    :SpellApi           Refresh generated types from the live MCP catalogue.
+    :SpellConfig        Reload personal expansions/hooks.
+    :SpellStats         Show attempts observed by this Neovim instance.
+    :Cast ruin          Submit a name to the native runtime pipeline.
+    :SpellDisarm        Disarm and cancel XivSpell following.
+
+From the native construction surface, :nvim SPELL + Enter opens that spell in
+the existing interactive Neovim (for example :nvim ruin). Names, IDs and
+expansions resolve normally; Tab completes a unique spell prefix. The runtime
+uses setup's editor_socket; this installation points at nvim-spaceghost.sock.
+An unavailable editor reports a failure without blocking the casting runtime.
+The existing buffer and its unsaved edits are reused. Save with :w in Neovim;
+the background runtime reloads the source and updates the game's spellcards.
+The command pauses the weave at its current step; > explicitly resumes it.
+It does not switch desktop focus or cast anything. :e remains the
+older in-game editor tile; :nvim opens the editor with full LuaLS support.
+
+K shows LuaLS hover help. Ctrl-Space requests API completion. The setup enables
+Neovim's built-in LSP completion and loads api/ plus lua/ as workspace libraries.
+It attaches to card files, grimoire.lua and Lua modules under lua/, including
+buffers already open when setup runs. Personal hooks share the typed API.
+Direct registrations also infer the event payload from the hook name:
+>
+    local remove = require('xivspell').on('before_cast', function(event)
+      -- event.intent, event.card, event.context and event.mode complete here.
+      if event.card.id == 'physick' then event.intent.target = 'self' end
+    end)
+    -- Call remove() to unregister this handler.
+<
+api/xiv.lua contains generated argument/result classes for all currently exposed
+XivMcp tools. Future mod providers appear after :SpellApi. The initial running
+catalogue has 172 methods; it is not a hand-maintained subset.
+
+SCRIPTABLE INTERFACES                                       *xivspell-api*
+
+The native plugin exposes authenticated loopback POST 127.0.0.1:41806/call,
+and the in-process Dalamud IPC string -> JSON gate XivSpell.Call. The token
+is generated in XivSpell.json inside the game's pluginConfigs directory.
+tools/bridge.py reads it beside Wine; tokens are not printed or copied into
+editor buffers. All game-memory access is marshalled onto the framework thread.
+
+Operations: snapshot, cards, events, input, command_result, cast, follow,
+unfollow, disarm and feedback. An input request is:
+>
+    {"method":"input","text":"ruin","requestId":"unique-input-id"}
+<
+Poll command_result with the returned requestId. queued is not completed.
+Duplicate input IDs reuse their recorded result within the bounded history.
+Raw cast/follow requests also require unique IDs. Transport timeouts do not
+cause automatic retries; the outcome may be unknown. The worker keeps a
+long-lived stdio connection instead of starting a process for each input.
+
+The additive stdio MCP server forwards the original XivMcp catalogue and adds
+spellbook_list, spellbook_read, spellbook_save, spellbook_status,
+spellbook_sessions, spellbook_api, spellbook_invoke, spellbook_result,
+spellbook_follow, spellbook_stop_follow, spellbook_disarm, spellbook_expand,
+and spellbook_hooks. Start it with:
+>
+    python3 tools/bridge.py --container ffxiv mcp
+<
+The stdio server runs up to four independent mod/game requests concurrently.
+Responses retain their JSON-RPC IDs and may arrive out of order. Ping and
+initialization do not wait behind slow tools. Requests use unique upstream IDs
+and share one session, preserving session-bound approvals and tickets.
+Spellcard saves retain arrival order and atomically replace source,
+so concurrent readers see a whole revision. Worker connections close at EOF.
+
+The library remains on the editor host, so MCP saves and Neovim edit the same
+files. Save preserves an older source copy in cards/.history and never executes
+the source itself. The running runtime notices the file change and reloads it.
+
+RUNTIME AND VERIFICATION                                  *xivspell-runtime*
+
+doc/PLAYTEST.txt records verified behavior and the next outdoor/duty checks.
+doc/playtest-readiness.json records the filtered live Arcanist/Sastasha/action
+data behind the current level-compatibility check. A completed player duty run,
+live healer follow and the deferred controller check remain outstanding.
+
+The installed xivspell-runtime.service hosts Lua independently of your editor
+windows. It reconnects after game/plugin restarts. To inspect or restart it:
+>
+    systemctl --user status xivspell-runtime
+    systemctl --user restart xivspell-runtime
+<
+The editor server is /run/user/1000/nvim-spaceghost.sock on this installation.
+The runtime has a separate xivspell-runtime.sock for diagnostics. Runtime
+attempts are logged in Neovim's state directory, xivspell/attempts.jsonl.
+Per-card Lua state and dot history currently live for the runtime session.
+
+Rebuild plugin: DALAMUD_HOME=/path/to/Dalamud dotnet build plugin/XivSpell.csproj.
+Current dev DLL: Z:\home\player\.xlcore\devPlugins\XivSpell\XivSpell.dll.
+
+Host checks:
+>
+    python3 -m unittest discover -s tests -v
+    nvim --headless -u NONE -l tests/spellbook.lua
+    nvim --headless -u NONE -l tests/lsp.lua
+<
+The Lua tests cover macro advancement, rejection/retry, in-flight input,
+instruction limits, name parsing, expansions, hook cancellation and dot repeat.
+The LSP test starts real LuaLS and requests actual completion items. Plugin
+compilation alone is not an in-game check. Keep follow and controller behavior
+unverified until the player has exercised them in the running game.
+
+vim:tw=78:ts=8:noet:ft=help:norl:
+
+MOVEMENT AND PLAYBACK
+
+Input mode and playback state are independent:
+
+    i          WEAVE      playback unchanged; compose new spells
+    movement   CONTROL    weave remains live; resume cast steps when still
+    Escape     CONTROL    explicitly pause at the current step
+    .          CONTROL    restart the constructed weave immediately
+    >          CONTROL    resume its retained cursor immediately
+
+Movement preserves the current spell step. Casts that need stillness wait until
+movement stops, then retry automatically. Instant spells (including casts made
+instant by procs) continue while moving. Slidecasts advance only when the game
+confirms the action. Interrupted macro casts retain their sequence substep.
+Movement never clears an explicit Escape pause. Late cancelled results cannot
+restart or advance an explicitly interrupted queue.
+Combat keeps the Grimoire at 95% opacity in Control, rising to full opacity while
+casting or weaving. Completed steps remain dimmed.
+
+UPDATED GRIMOIRE INPUT
+
+WEAVE and CONTROL are the two input modes. Casting is enabled by default;
+/xivspell off stops it, and /xivspell input resumes. Original game chat is hidden.
+In combat, Enter focuses Grimoire. Tap Backspace to edit a character, or delete
+one spell when the draft is empty. Holding Backspace erases the draft character
+by character first. Continue holding for 600 ms after the text is gone to clear
+the spell line; release before then to keep the spells. /xivspell clear clears
+the line immediately.
+
+Explicit lines use Enter, for example:
+  on focus physick
+  on "Dusk Bat" ruin
+  if self.hp < 50% then on self physick else on current ruin
+
+Conditions are evaluated when that line is invoked, not as background triggers.
+Type ? followed by a request and Enter for a local-model suggestion. The
+suggestion stays in the draft: Enter again compiles and adds it to the weave.
+New typing, clearing, Escape, or focus loss discards stale model replies.
+
+
+ENCOUNTER TARGETS
+
+A running line belongs to one selected encounter and to the enemy it first casts
+on. A death, disappearance, deselection, or target switch stops the line. Choosing
+another enemy does not resume it. Press . to restart, or > / empty Enter to
+continue at the saved step. A confirmed killing cast remains spent.
+
+  on nearest enemy ruin       cast on the nearest living hostile
+  on nearest mob ruin         nearest hostile excluding the marked :boss
+  target nearest enemy        select nearest hostile, without casting
+  target nearest mob          select nearest non-boss hostile, without casting
+  target nearest enemy ruin   shorthand for on nearest enemy ruin
+
+Nearest is distance-based even when a farther enemy is already selected. The
+existing enemy selector keeps preferring the selected enemy. Nearest selectors
+never hop to another victim automatically after the encounter ends.
+
+COOLDOWNS AND REPETITIONS
+
+Spell steps form one horizontal line. The panel widens smoothly for longer
+lines, up to the available screen width. Extra-long lines scroll to follow the
+current step; edge markers show how many groups remain outside the view. The
+input and condition text use the wider panel too. The backing is fully transparent.
+Unspent icons stay bright, with larger outlined labels. Idle content remains at
+82% opacity; hovering raises it to 99%. Spent steps stay dim.
+
+Each spell shows cast/recast time and progress. Recovery stays highlighted until
+the next step's cooldown permits execution. A repetition badge counts remaining
+casts for this run: x4, x3, x2, x1. Once spent it dims and restores the original
+count for the next run; . restarts the whole saved line.
+
+CONTROLLER WEAVING
+
+Press L3+R3 (both stick clicks), or /xivspell pad, to morph into the controller
+spell wheel. Release the opening chord before navigating.
+
+  D-pad left/right     choose spell
+  D-pad up/down        choose target
+  L1 / R1              choose condition
+  A / Cross            add the selected spell, or submit the voice/typed draft
+  X / Square           erase a draft character or the previous spell
+  Y / Triangle         start microphone; press again to finish
+  Start / Options      continue and return controller input to the game
+  Select / Create      restart the line and return controller input to the game
+  B / Circle           stop and close
+
+The left stick and other native controls return to the game when the composer
+closes. Neutral handoff prevents a held menu button from activating a game
+command. The global Dalamud controller-navigation setting is left unchanged.
+
+STREAMING-CLIENT MICROPHONE
+
+Open https://fedora.bishop-bearded.ts.net:8447/ on the streaming client connected
+to the existing tailnet. Enable microphone once and choose the controller or
+headset device. Keep the page open; Y / Triangle in the wheel starts and stops
+capture. /xivspell voice provides the same toggle with keyboard input.
+
+The client sends mono 16 kHz WAV audio to the game host's local whisper.cpp
+service. No cloud speech API is used. Words appear as an editable Grimoire draft;
+Enter / A validates and weaves them. Natural-language translation can require a
+second confirmation of the translated suggestion. Escape or B cancels recording.
+Draft edits made while recording prevent the transcript from overwriting them.
+
+Tools: tools/voice_relay.py, tools/voice-client.html, lua/xivspell/voice.lua.
+Services: xivspell-speech.service and xivspell-voice.service, alongside the Lua
+runtime. The private HTTPS proxy is tailscale serve --bg --https=8447
+http://127.0.0.1:41807. Remove only that mapping with tailscale serve --https=8447
+off. A client without tailnet access can instead SSH-forward localhost:41807 and
+open http://localhost:41807/ (localhost supports browser microphone permission).
+
+
+IN-GAME SPELL EDITOR
+
+:e SPELL opens a movable editor tile inside FFXIV. :e without a name opens the
+current spell. The same tile opens from a spellbook icon or /xivspell edit SPELL.
+
+  :w / Ctrl+S    validate, save, and reload the spell
+  :wq            save, then close if there are no newer edits
+  :q             close; unsaved edits stay open
+  Revert         discard changes made since the last successful save
+
+The tile keeps a transparent background. Source text and labels have dark
+outlines and a soft shadow for contrast against the world. The tile has a
+separate command input, so :w is never inserted into your Lua.
+The Grimoire shows the command guide below the spell input. Code is checked with
+the bounded Lua compiler before replacing a spell file. Failed validation and
+conflicts leave the file and running spell unchanged. Prior versions are backed
+up in the runtime state directory under xivspell/backups. Unsaved tile content
+survives plugin reloads. Opening the tile pauses playback at its saved position.
+
+Spell labels and icons share the live Action data, including adjusted actions.
+A queued icon is retried after deck synchronization instead of caching a missing
+card as a finished lookup. A played macro step displays the action it performed.

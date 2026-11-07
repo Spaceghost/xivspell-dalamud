@@ -1,0 +1,9 @@
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+  <PropertyGroup>
+    <AssemblyName>XivSpell</AssemblyName>
+    <Version>0.1.0.1</Version>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+  <ItemGroup><PackageReference Include="KamiToolKit" Version="[2.2.48]" /></ItemGroup>
+</Project>
