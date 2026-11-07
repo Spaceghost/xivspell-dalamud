@@ -9,6 +9,7 @@ public sealed partial class Plugin
     private readonly RhythmRound rhythm = new();
     private NativeRhythmHud? rhythmHud;
     private bool rhythmShown;
+    private bool rhythmStartPending;
     private bool rhythmSongChart;
     private const double RhythmApproach = 8;
     private bool rhythmQueued, rhythmAvailable, rhythmPadReleased = true;
@@ -70,8 +71,11 @@ public sealed partial class Plugin
         .Select(c => new RhythmRound.Spell(c.Id, c.Phrase, c.Name)).ToArray();
     private void BeginRhythm()
     {
+        if (disposed) return;
+        rhythmShown=true;
         var deck = RhythmDeck();
-        if (deck.Length == 0) { weave.Hint = "Rhythm needs a connected Lua spell deck"; return; }
+        if (deck.Length == 0) { rhythmStartPending=true; weave.Hint = "Rhythm is waiting for the Lua spell deck"; return; }
+        rhythmStartPending=false;
         if (weave.Runes.Count >= SpellWeave.Capacity) { weave.Hint = "Weave full · cast or remove a rune first"; return; }
         if (weave.Draft.Length > 0) { weave.Hint = "Finish or save your current draft before a rhythm round"; return; }
         if (weave.InFlight != null || castPlayback.Request != null) { weave.Hint = "Finish the current cast before starting a rhythm round"; return; }
@@ -120,12 +124,13 @@ public sealed partial class Plugin
     }
     private void SuspendRhythm()
     {
-        rhythm.Pause(RhythmNow); rhythmAvailable = false; rhythmPadReleased = true;
+        rhythm.Pause(RhythmNow); rhythmAvailable = false; rhythmPadReleased = true;rhythmStartPending=false;
     }
     private void UpdateRhythm(bool eligible)
     {
         rhythmAvailable = eligible && config.RhythmEnabled;
         if (!rhythmAvailable) { SuspendRhythm(); return; }
+        if (rhythmStartPending && cards.Length>0) BeginRhythm();
         var now = RhythmNow;
         if (config.RhythmUsePiano && Environment.TickCount64-timelinePoll>=250) {
             timelinePoll=Environment.TickCount64;
