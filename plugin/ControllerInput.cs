@@ -14,9 +14,11 @@ public sealed partial class Plugin
         var frame = pad.Read(eligible, composer.Active || RhythmPadOwned);
         if (!eligible) { composer.Active = false; return; }
         if (pad.TakeOpen()) {
-            if (config.RhythmEnabled && config.RhythmController) {
-                if (rhythm.Active) { SuspendRhythm(); InterruptWeave("Rhythm paused", true); }
-                else BeginRhythm();
+            if (config.RhythmEnabled) {
+                var wasController=config.RhythmController;
+                config.RhythmController=true;pi.SavePluginConfig(config);
+                if (rhythm.Active && wasController) { SuspendRhythm(); InterruptWeave("Rhythm paused", true); }
+                else { rhythm.Pause(RhythmNow);BeginRhythm(); }
                 padSequence = 0; return;
             }
             composer.Active = !composer.Active; padSequence = 0;

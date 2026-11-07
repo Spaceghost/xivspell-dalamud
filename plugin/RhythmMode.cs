@@ -203,7 +203,10 @@ public sealed partial class Plugin
     {
         if (!config.RhythmEnabled) return false;
         if (input.Type is SpellKeyboard.Kind.Escape or SpellKeyboard.Kind.Movement) { SuspendRhythm(); return false; }
-        if (input.Type == SpellKeyboard.Kind.Input) { BeginRhythm(); return true; }
+        if (input.Type == SpellKeyboard.Kind.Input) {
+            if (config.RhythmController) { config.RhythmController=false;pi.SavePluginConfig(config); }
+            BeginRhythm(); return true;
+        }
         if (!rhythm.Active) return false;
         var at = input.At / 1000d;
         if (input.Type == SpellKeyboard.Kind.Character) {

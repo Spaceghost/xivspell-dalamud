@@ -46,6 +46,8 @@ come from available spell-name completions, with distinct decoys filling spare
 buttons. Keyboard mode uses `>` to cast and move, `.` to repeat, `i` to weave
 another, and Escape to pause. Native buttons also choose spells, pause/resume,
 change input mode, cast, select Piano/guide timing and tap a beat.
+The both-stick chord also selects controller mode directly; `i` from control
+mode selects keyboard spelling, so either device can start without a mouse.
 
 Piano's optional `XivPiano.RhythmTimeline.v1` feed supplies up to 30 seconds of
 future song onsets from a separate background decode of its downloaded song.
