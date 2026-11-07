@@ -188,10 +188,15 @@ public sealed class RhythmRound
 // the exact event timestamp, independently of frame rate and song interval.
 public static class RhythmPulse
 {
+    public static (double Inner,double Outer) SafeZone(double hitWindow,double interval)
+    {
+        var window=double.IsFinite(hitWindow) ? Math.Clamp(hitWindow,0,.5) : .18;
+        return (Radius(-window,interval),Radius(window,interval));
+    }
     public static double Radius(double remaining,double interval)
     {
         if (!double.IsFinite(remaining)) return 1.9;
         if (!double.IsFinite(interval)) interval=.5;
-        return 1+.9*Math.Clamp(remaining/Math.Clamp(interval,.25,1.2),-.12,1);
+        return 1+.9*Math.Clamp(remaining/Math.Clamp(interval,.25,1.2),-.8,1);
     }
 }

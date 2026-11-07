@@ -209,7 +209,7 @@ public sealed partial class Plugin
             }
             // A lost result is an unknown outcome: retain the cursor and require explicit continuation.
             if (weave.InFlight != null && (Environment.TickCount64 - weaveSentAt > 35000 || Environment.TickCount64 - lastRuntimePoll >= 3000)) InterruptWeave("Spellbook disconnected");
-            hud.Render(weave, cards, data, armed, Environment.TickCount64 - lastRuntimePoll < 3000, conditions[Dalamud.Game.ClientState.Conditions.ConditionFlag.InCombat], RuneTarget, ReadCooldown, composer);
+            hud.Render(weave, cards, data, armed, Environment.TickCount64 - lastRuntimePoll < 3000, conditions[Dalamud.Game.ClientState.Conditions.ConditionFlag.InCombat], RuneTarget, ReadCooldown, composer, config.RhythmEnabled && rhythmShown);
             RenderRhythmHud();
         } catch (Exception ex) { log.Error(ex, "Spell weave update"); InterruptWeave("Weave paused"); }
     }
@@ -308,6 +308,7 @@ public sealed partial class Plugin
 internal sealed class WeaveHud : OverlayNode
 {
     public Action<string>? OpenSource { get; init; }
+    public Vector2 SpellEntryPosition { get; private set; }
     public override bool HideWithNativeUi => false;
     public override bool HideWithUiToggled => true;
     public override OverlayLayer OverlayLayer => OverlayLayer.AboveUserInterface;
@@ -487,7 +488,7 @@ internal sealed class WeaveHud : OverlayNode
             wheelNames[i].Alpha = morph * (i == 0 ? 1 : .9f);
         }
     }
-    public void Render(SpellWeave weave, Card[] cards, IDataManager data, bool live, bool online, bool inCombat, Func<SpellWeave.Rune, int, RuneTarget> target, Func<SpellWeave.Rune, int, SpellTiming> timing, ControllerComposer composer)
+    public void Render(SpellWeave weave, Card[] cards, IDataManager data, bool live, bool online, bool inCombat, Func<SpellWeave.Rune, int, RuneTarget> target, Func<SpellWeave.Rune, int, SpellTiming> timing, ControllerComposer composer, bool rhythmMode=false)
     {
         var recovery = weave.InFlight == null && !weave.Paused && weave.Cursor > 0 && weave.Next is { } next && timing(next, weave.Cursor).Remaining > .05f;
         var playing = weave.InFlight != null || recovery;
@@ -495,7 +496,7 @@ internal sealed class WeaveHud : OverlayNode
         WeavePresentation.Fill(stacks, weave, target);
         const float spacing = 92;
         var maximumWidth = MathF.Max(240, MathF.Min(960, viewport.Size.X - 64));
-        var wantedWidth = Math.Clamp(stacks.Count * spacing + 48, MathF.Min(composer.Active ? 560 : 420, maximumWidth), maximumWidth);
+        var wantedWidth = Math.Clamp(stacks.Count * spacing + 48, MathF.Min(composer.Active || rhythmMode ? 560 : 420, maximumWidth), maximumWidth);
         lineWidth += (wantedWidth - lineWidth) * .2f;
         lineWidth = MathF.Min(lineWidth, maximumWidth);
         var focus = stacks.FindIndex(s => s.Contains(weave.Cursor));
@@ -536,7 +537,7 @@ internal sealed class WeaveHud : OverlayNode
         Alpha = opacity;
         var now = Environment.TickCount64;
         var mode = composer.Active ? "COMPOSE" : weave.InputMode ? "WEAVE" : "CONTROL";
-        title.String = $"G R I M O I R E   ◇   {mode}{(weave.Paused ? " · PAUSED" : "")}";
+        title.String = rhythmMode ? "G R I M O I R E   ◇   S P E L L S T R I N G S" : $"G R I M O I R E   ◇   {mode}{(weave.Paused ? " · PAUSED" : "")}";
         RenderWheel(composer, cards, data, controllerMorph, lineWidth);
         title.TextColor = weave.Paused || !live ? Gold : Ice;
         var hiddenLeft = 0; var hiddenRight = 0;
@@ -645,7 +646,9 @@ internal sealed class WeaveHud : OverlayNode
         controls.String = composer.Active ? "L3+R3 close · Start continue · Select restart" : weave.Paused ? "> continue here   ·   . repeat weave   ·   i construct" : "i construct   ·   Esc stop   ·   . repeat   ·   > continue";
         // Native text and icons float directly over the scene. Reserve space
         // only for visible content rather than a permanent instruction panel.
-        var actualHeight = editing ? footer + 68 : showControls ? footer + 24 : hint.IsVisible ? y + 62 : y + 40;
+        letters.IsVisible = !rhythmMode;
+        if (rhythmMode) hint.IsVisible = controls.IsVisible = editorCommands.IsVisible = editorMore.IsVisible = false;
+        var actualHeight = rhythmMode ? y + 200 : editing ? footer + 68 : showControls ? footer + 24 : hint.IsVisible ? y + 62 : y + 40;
         for (var i = 0; i < ink.Length; i++) {
             var inset = i * 2.2f;
             ink[i].Position = new(inset - 22, inset * .55f - 12);
@@ -653,6 +656,7 @@ internal sealed class WeaveHud : OverlayNode
         }
         Size = new(lineWidth, actualHeight);
         Position = new((viewport.Size.X - lineWidth) / 2, MathF.Max(16, MathF.Min(viewport.Size.Y * .72f, viewport.Size.Y - actualHeight - 16)));
+        SpellEntryPosition = Position + new Vector2(0,y);
         RenderSourcePreview();
     }
 }

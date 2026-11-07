@@ -75,4 +75,14 @@ Check(RhythmPulse.Radius(.2,.5)>RhythmPulse.Radius(.1,.5) && RhythmPulse.Radius(
 Check(Math.Abs(RhythmPulse.Radius(.2,.4)-RhythmPulse.Radius(.4,.8))<.00001,"Irregular musical intervals retain the same visual timing phase");
 Check(Math.Abs(RhythmPulse.Radius(10-(10.1-.1),.5)-1)<.00001,"Visual contact uses the same latency-calibrated clock as key grading");
 Check(double.IsFinite(RhythmPulse.Radius(1,double.NaN)),"Missing tempo cannot corrupt native ring geometry");
-Console.WriteLine("PASS free spell branching, whole-word resets, idle beats, timing, queue/delete, pause, future music and reverse-pulse alignment");
+var zone=RhythmPulse.SafeZone(.18,.5);
+Check(zone.Inner<1 && zone.Outer>1 && zone.Outer-zone.Inner>.6,"The full valid timing band is visibly broad around the perfect ring");
+foreach(var offset in new[]{-.21,-.179,-.1,0,.1,.179,.21}) {
+ var radius=RhythmPulse.Radius(-offset,.5);
+ var depicted=radius>=zone.Inner && radius<=zone.Outer;
+ var sample=new RhythmRound();sample.Start(deck,10,.5);
+ var grade=sample.Press('r',10+offset);
+ var accepted=grade is RhythmRound.Grade.Perfect or RhythmRound.Grade.Great or RhythmRound.Grade.Good;
+ Check(depicted==accepted,"Shaded safe zone and key grading agree before and after the ideal time");
+}
+Console.WriteLine("PASS free spelling, whole-word resets, pause, future music, reverse pulse and accurate full-window safe-zone depiction");

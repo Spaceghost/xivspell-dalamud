@@ -1,3 +1,8 @@
+0.1.0.5
+- Embed the soft reverse pulse beside the word in the existing native Grimoire HUD.
+- Shade the entire accepted timing band instead of depicting a tiny target line.
+- Remove the large separate header, spelling panel, and flashing WAIT/NOW cues.
+
 0.1.0.4
 - Free spelling with a native reverse pulse: type any spell, with no selection.
 - Wrong, missed, or off-beat characters restart the unfinished spell from its first letter.

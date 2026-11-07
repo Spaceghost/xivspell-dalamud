@@ -35,7 +35,9 @@ and model. Do not copy another player's configuration or credentials.
 ## Rhythm weaving
 
 `/xivspell rhythm on` opens **Spellstrings** in the existing native spell HUD.
-A reverse pulse contracts toward a fixed target ring. Type when the rings meet.
+A small reverse-pulse sigil sits beside the word in Grimoire’s existing rune HUD.
+Type while the pulse is inside its shaded safe zone. The gold ring marks perfect
+timing; the whole shaded annulus reflects the actual accepted timing window.
 Type **any spell** from your Lua deck, one character per pulse; there is no spell picker or prescribed sequence.
 The upright word display shows your prefix and matching spells. Wrong letters,
 off-beat characters, or a missed pulse during a word reset that entire word.

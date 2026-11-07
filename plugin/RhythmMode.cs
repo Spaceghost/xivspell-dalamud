@@ -109,8 +109,8 @@ public sealed partial class Plugin
         if (rhythmHud==null) return;
         rhythmHud.IsVisible=config.RhythmEnabled && rhythmShown && barVisible && objects.LocalPlayer!=null && !gameGui.GameUiHidden;
         if (!rhythmHud.IsVisible) return;
-        rhythmHud.Render(rhythm,rhythmMusic,rhythmClock.Bpm,weave.Runes.Select(r=>r.Command).ToArray(),
-            rhythmClock.Energy,config.RhythmUsePiano);
+        rhythmHud.Render(rhythm,rhythmMusic,rhythmClock.Bpm,
+            hud!.SpellEntryPosition,hud.Size.X,config.RhythmUsePiano);
     }
     private void SuspendRhythm()
     {
