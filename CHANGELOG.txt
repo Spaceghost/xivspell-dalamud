@@ -1,3 +1,17 @@
+2026-11-07 / native two-hand highway and future song charts
+
+Spellstrings now uses the same native overlay nodes as the existing spell HUD.
+Two perspective hand lanes replace the ImGui window and four-track view. Notes
+show the exact keyboard key or D-pad/face button, aligned within its hand lane.
+The approach lasts eight seconds. Native controls select spells and input mode,
+pause/resume, cast, switch timing source and tap along with game music.
+
+Piano's new RhythmTimeline.v1 feed supplies future song-relative onsets from an
+independent background decoder. Charts and missed-letter retries use those
+upcoming timings when available; guide timing remains explicitly labelled.
+Offline timing/hand mapping tests pass. Player acceptance of this revision is
+pending; earlier feedback applies to the preceding rhythm implementation.
+
 2026-11-07 / Spellstrings rhythm weaving (development)
 
 Keyboard spelling and four-button controller charts bring a scrolling letter

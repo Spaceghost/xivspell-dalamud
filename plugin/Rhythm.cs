@@ -87,7 +87,7 @@ public sealed class RhythmRound
     public bool Completed => State == Phase.Ready && Hits == Notes.Length && Notes.Length > 0;
     private double notePeriod = .5, lastInput = double.NegativeInfinity;
 
-    public bool Start(Spell spell, IReadOnlyList<Spell> deck, double firstBeat, double period)
+    public bool Start(Spell spell, IReadOnlyList<Spell> deck, double firstBeat, double period, IReadOnlyList<double>? musicTimes = null)
     {
         if (string.IsNullOrWhiteSpace(spell.Id) || string.IsNullOrWhiteSpace(spell.Phrase) ||
             spell.Phrase.Length > 64 || spell.Phrase.Any(char.IsControl) ||
@@ -101,6 +101,9 @@ public sealed class RhythmRound
             prefix += ch;
         }
         Notes = notes.ToArray(); notePeriod = period; Cursor = Score = Combo = BestCombo = Hits = Misses = Perfects = 0;
+        if (musicTimes != null && musicTimes.Count >= Notes.Length && musicTimes.Take(Notes.Length).All(double.IsFinite) &&
+            musicTimes.Take(Notes.Length).Zip(musicTimes.Skip(1), (a,b) => b-a).All(gap => gap >= .20))
+            for (var i = 0; i < Notes.Length; i++) Notes[i] = Notes[i] with { Due = musicTimes[i] };
         LastGrade = Grade.None; LastFeedback = lastInput = double.NegativeInfinity;
         State = Phase.Playing;
         return true;
@@ -115,7 +118,7 @@ public sealed class RhythmRound
         uint seed = 2166136261;
         foreach (var c in prefix) seed = (seed ^ c) * 16777619;
         seed = (seed ^ required) * 16777619;
-        var result = new char[4]; var lane = (int)(seed % 4); result[lane] = required;
+        var result = new char[8]; var lane = (int)(seed % 8); result[lane] = required;
         var used = new HashSet<char> { required };
         for (var i = 0; i < result.Length; i++) {
             if (i == lane) continue;
@@ -141,7 +144,7 @@ public sealed class RhythmRound
         }
     }
     public Grade PressLane(int lane, double at) =>
-        lane is >= 0 and < 4 && Cursor < Notes.Length ? Press(Notes[Cursor].Choices[lane], at) : Grade.None;
+        lane is >= 0 and < 8 && Cursor < Notes.Length ? Press(Notes[Cursor].Choices[lane], at) : Grade.None;
     public Grade Press(char letter, double at)
     {
         if (!Active || Cursor >= Notes.Length || !double.IsFinite(at) || at < lastInput) return Grade.None;
@@ -173,9 +176,42 @@ public sealed class RhythmRound
         if (State != Phase.Paused || Cursor >= Notes.Length || !double.IsFinite(firstBeat)) return;
         Shift(firstBeat - Notes[Cursor].Due); State = Phase.Playing;
     }
+    public void Resume(IReadOnlyList<double> times)
+    {
+        if (State != Phase.Paused || times.Count < Notes.Length-Cursor || times.Any(t => !double.IsFinite(t)) ||
+            times.Zip(times.Skip(1),(a,b) => b-a).Any(gap => gap < .2)) return;
+        for (var i = Cursor; i < Notes.Length; i++) Notes[i] = Notes[i] with { Due = times[i-Cursor] };
+        State = Phase.Playing;
+    }
+    public bool Rechart(IReadOnlyList<double> times)
+    {
+        if (!Active || times.Count < Notes.Length-Cursor || times.Any(t=>!double.IsFinite(t)) ||
+            times.Zip(times.Skip(1),(a,b)=>b-a).Any(gap=>gap<.2)) return false;
+        for (var i=Cursor;i<Notes.Length;i++) Notes[i]=Notes[i] with { Due=times[i-Cursor] };
+        return true;
+    }
     public void Stop() { State = Phase.Idle; }
     private void Shift(double amount)
     {
         for (var i = Cursor; i < Notes.Length; i++) Notes[i] = Notes[i] with { Due = Notes[i].Due + amount };
     }
+}
+
+public static class RhythmHands
+{
+    private const string Left = "12345qwertasdfgzxcvb";
+    private static readonly string[] Rows = ["12345", "qwert", "asdfg", "zxcvb", "67890", "yuiop", "hjkl;", "nm,./"];
+    public static int Hand(RhythmRound.Note note, bool controller) => controller ? note.Lane / 4 :
+        note.Letter == ' ' ? note.LetterIndex % 2 : Left.Contains(note.Letter) ? 0 : 1;
+    public static string Button(int index) => index switch { 0 => "←", 1 => "↑", 2 => "↓", 3 => "→", 4 => "□", 5 => "△", 6 => "×", 7 => "○", _ => "?" };
+    public static float Alignment(RhythmRound.Note note, bool controller)
+    {
+        if (controller) return note.Lane % 4 switch { 0 => .15f, 3 => .85f, _ => .5f };
+        foreach (var row in Rows) {
+            var at = row.IndexOf(note.Letter);
+            if (at >= 0) return .15f + at * .175f;
+        }
+        return .5f;
+    }
+    public static string Prompt(RhythmRound.Note note, bool controller) => controller ? Button(note.Lane) : note.Letter == ' ' ? "SPACE" : char.ToUpperInvariant(note.Letter).ToString();
 }

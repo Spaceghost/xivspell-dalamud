@@ -90,7 +90,8 @@ public sealed partial class Plugin : IDalamudPlugin
         config.RhythmSubdivision = Math.Clamp(config.RhythmSubdivision, 1, 2);
         rhythmClock.SetTempo(config.RhythmBpm, RhythmNow);
         weave.Restore(config.Weave);
-        weave.EnterInput();
+        if (config.Weave==null) weave.EnterInput();
+        if (config.RhythmEnabled) weave.EnterControl();
         editorCard = config.EditorCard; editorSource = config.EditorSource; editorSavedSource = config.EditorOriginal;
         // Recover unsaved work, but do not reopen a clean legacy editor over
         // the automatic spell-construction surface after a client restart.
@@ -192,6 +193,8 @@ public sealed partial class Plugin : IDalamudPlugin
             playbackPaused = weave.Paused, runeCount = weave.Runes.Count, padOwned = RhythmPadOwned,
             clockNow = RhythmNow,
             nextNote = rhythm.Cursor < rhythm.Notes.Length ? rhythm.Notes[rhythm.Cursor] : null,
+            renderer="native", lanes=2, approachSeconds=RhythmApproach, songTimelineReady=songReady,
+            songChart=rhythmSongChart, futurePulses=futurePulses.Length,
         };
         if (r.Method is "compiled" or "translated") {
             if (r.RequestId != draftRequest || weave.DraftRevision != draftRequestRevision || !weave.InputMode) return new { discarded = true };
@@ -396,7 +399,6 @@ public sealed partial class Plugin : IDalamudPlugin
 
     private void Draw()
     {
-        DrawRhythm();
         DrawSpellEditor();
         if (!visible) return;
         ImGui.SetNextWindowSize(new Vector2(410, 360), ImGuiCond.FirstUseEver);

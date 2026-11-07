@@ -25,9 +25,9 @@ Check(Math.Abs(clock.Bpm - 100) < .01, "Tap tempo follows game music without cap
 
 var r = new RhythmRound();
 Check(r.Start(deck[0], deck, 4, .5), "Valid spell chart starts");
-Check(r.Notes.All(n => n.Choices.Length == 4 && n.Choices.Distinct().Count() == 4 && n.Choices[n.Lane] == n.Letter), "Every note has exactly four unique lanes and one target");
+Check(r.Notes.All(n => n.Choices.Length == 8 && n.Choices.Distinct().Count() == 8 && n.Choices[n.Lane] == n.Letter), "Every note has eight distinct controller choices across two hands");
 Check(RhythmRound.Choices("r",'u',deck).Contains('a'), "Available completion branches precede decoys");
-Check(RhythmRound.Choices("ruin",'x',[]).Distinct().Count() == 4, "No completions still supplies three distinct decoys");
+Check(RhythmRound.Choices("ruin",'x',[]).Distinct().Count() == 8, "No completions still supplies seven distinct decoys");
 Check(r.Press('r',3) == RhythmRound.Grade.Early && r.Cursor == 0, "Early typing never spends a note");
 Check(r.Press('r',4) == RhythmRound.Grade.Perfect, "Keyboard spelling earns timing grades");
 Check(r.Press('z',4.5) == RhythmRound.Grade.Wrong && r.Cursor == 1 && r.Combo == 0, "Wrong letter preserves the expected letter");
@@ -58,4 +58,11 @@ weave.Add("ruin","ruin"); weave.Interrupt("Rhythm woven"); weave.EnterControl();
 Check(weave.Next == null && weave.InFlight == null, "Completed spelling stays paused");
 weave.Resume();
 Check(!weave.InputMode && weave.Next?.CardId == "ruin", "Explicit continuation keeps keyboard free for movement");
-Console.WriteLine("PASS music onset estimation, source reset, tap tempo, four-lane completion choices, timing grades, retry, pause, calibration and modal casting");
+var keyboardLeft = new RhythmRound.Note('r',0,[],1,0);
+var keyboardRight = keyboardLeft with { Letter='u' };
+Check(RhythmHands.Hand(keyboardLeft,false)==0 && RhythmHands.Hand(keyboardRight,false)==1,"Keyboard notes follow physical left/right hand groups");
+Check(RhythmHands.Hand(keyboardLeft with { Lane=7 },true)==1 && RhythmHands.Prompt(keyboardLeft with { Lane=7 },true)=="○","Controller notes show the exact physical button and hand");
+Check(RhythmHands.Alignment(keyboardLeft,false)>RhythmHands.Alignment(keyboardLeft with { Letter='q' },false),"Letters align to keyboard columns within each hand");
+r.Start(deck[0],deck,10,.5,[10,10.4,11,11.7]);
+Check(r.Notes[3].Due==11.7,"Future song onsets supply note timing instead of a guessed uniform grid");
+Console.WriteLine("PASS music estimation, song look-ahead timing, two-hand alignment, completion choices, grading, retry, pause, calibration and modal casting");

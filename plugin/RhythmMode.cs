@@ -1,6 +1,5 @@
-using System.Numerics;
 using System.Text.Json;
-using Dalamud.Bindings.ImGui;
+using FFXIVClientStructs.FFXIV.Client.System.Input;
 
 namespace XivSpell;
 
@@ -8,6 +7,10 @@ public sealed partial class Plugin
 {
     private readonly RhythmClock rhythmClock = new();
     private readonly RhythmRound rhythm = new();
+    private NativeRhythmHud? rhythmHud;
+    private bool rhythmShown;
+    private bool rhythmSongChart;
+    private const double RhythmApproach = 8;
     private bool rhythmQueued, rhythmAvailable, rhythmPadReleased = true;
     private bool RhythmPadOwned => !rhythmPadReleased && config.RhythmEnabled && config.RhythmController && rhythm.State is RhythmRound.Phase.Playing or RhythmRound.Phase.Ready;
     private long rhythmPoll;
@@ -15,9 +18,26 @@ public sealed partial class Plugin
     private int rhythmCard;
     private string rhythmMusic = "Tempo guide · start Piano or tap along with game music";
     private static double RhythmNow => Environment.TickCount64 / 1000d;
-    private static readonly Vector4[] RhythmColors = [new(.96f,.36f,.72f,1), new(.47f,.93f,.56f,1), new(.27f,.76f,1,1), new(1,.59f,.32f,1)];
-    private static readonly string[] RhythmButtons = ["Square / X", "Triangle / Y", "Cross / A", "Circle / B"];
     private readonly RhythmSound rhythmSound = new();
+    private sealed record FuturePulse(double Seconds,float Strength);
+    private FuturePulse[] futurePulses = [];
+    private double songPosition, songSampleAt;
+    private long songStream, timelinePoll;
+    private bool songReady, songPlaying;
+    private double[]? MusicTimes(int count,double lead=RhythmApproach)
+    {
+        if (!config.RhythmUsePiano || !songReady || !songPlaying) return null;
+        var now=RhythmNow;
+        var position=songPosition+Math.Max(0,now-songSampleAt);
+        var result=new List<double>();var last=double.NegativeInfinity;
+        foreach (var pulse in futurePulses) {
+            if (pulse.Seconds<position+lead) continue;
+            if (pulse.Seconds-last < (config.RhythmSubdivision==2 ? .22 : .32)) continue;
+            result.Add(now+pulse.Seconds-position);last=pulse.Seconds;
+            if (result.Count==count) return result.ToArray();
+        }
+        return null;
+    }
 
     private bool RhythmCommand(string args)
     {
@@ -35,6 +55,14 @@ public sealed partial class Plugin
             rhythmClock.SetTempo(config.RhythmBpm, RhythmNow);
         } else if (words[1] is "pad" or "keyboard") config.RhythmController = words[1] == "pad";
         else if (words[1] == "piano") config.RhythmUsePiano = true;
+        else if (words[1] == "offset" && words.Length==3 && float.TryParse(words[2],out var offset) && float.IsFinite(offset))
+            config.RhythmLatencyMs=Math.Clamp(offset,-250,250);
+        else if (words[1] == "volume" && words.Length==3 && float.TryParse(words[2],out var volume) && float.IsFinite(volume))
+            config.RhythmVolume=Math.Clamp(volume,0,.3f);
+        else if (words[1] == "speed" && words.Length==3 && int.TryParse(words[2],out var speed)) config.RhythmSubdivision=Math.Clamp(speed,1,2);
+        else if (words[1] == "sound" && words.Length==3 && words[2] is "on" or "off") config.RhythmSound=words[2]=="on";
+        else if (words[1] == "next") ChangeRhythmSpell(1);
+        else if (words[1] == "previous") ChangeRhythmSpell(-1);
         else { weave.Hint = "rhythm on|off|pad|keyboard|piano|tap|tempo BPM"; return true; }
         pi.SavePluginConfig(config); return true;
     }
@@ -50,13 +78,45 @@ public sealed partial class Plugin
         InterruptWeave("Rhythm composing", false);
         weave.EnterInput();
         rhythm.LatencyMs = config.RhythmLatencyMs;
-        if (rhythm.State == RhythmRound.Phase.Paused) rhythm.Resume(rhythmClock.NextBeat(RhythmNow) + rhythmClock.Period * 3);
+        if (rhythm.State == RhythmRound.Phase.Paused) {
+            var times=MusicTimes(rhythm.Notes.Length-rhythm.Cursor);rhythmSongChart=times!=null;
+            if (times!=null) rhythm.Resume(times);
+            else rhythm.Resume(rhythmClock.NextBeat(RhythmNow+RhythmApproach));
+        }
         else {
-            rhythm.Start(deck[Math.Clamp(rhythmCard, 0, deck.Length - 1)], deck,
-                rhythmClock.NextBeat(RhythmNow) + rhythmClock.Period * 3, rhythmClock.Period / config.RhythmSubdivision);
+            var selected=deck[Math.Clamp(rhythmCard,0,deck.Length-1)];var times=MusicTimes(selected.Phrase.Length);rhythmSongChart=times!=null;
+            rhythm.Start(selected, deck,
+                rhythmClock.NextBeat(RhythmNow+RhythmApproach), rhythmClock.Period / config.RhythmSubdivision,
+                times);
             rhythmQueued = false;
         }
-        rhythmPadReleased = false; composer.Active = false; barVisible = true;
+        rhythmShown=true; rhythmPadReleased = false; composer.Active = false; barVisible = true;
+    }
+    private void ChangeRhythmSpell(int direction)
+    {
+        var deck=RhythmDeck();if (deck.Length==0) return;
+        rhythmCard=(rhythmCard+direction+deck.Length)%deck.Length;rhythm.Stop();BeginRhythm();
+    }
+    private void CreateRhythmHud()
+    {
+        rhythmHud=new NativeRhythmHud {
+            SelectSpell=ChangeRhythmSpell,
+            Toggle=()=>{ if (rhythm.Active) { SuspendRhythm();InterruptWeave("Rhythm paused",true); } else BeginRhythm(); },
+            Cast=()=>StartPlayback(),
+            ChangeMode=()=>{ config.RhythmController=!config.RhythmController;SuspendRhythm();pi.SavePluginConfig(config);BeginRhythm(); },
+            Tap=()=>{ config.RhythmUsePiano=false;rhythmClock.Tap(RhythmNow);pi.SavePluginConfig(config); },
+            Source=()=>{ config.RhythmUsePiano=!config.RhythmUsePiano;pi.SavePluginConfig(config); },
+        };
+        hudController!.AddNode(rhythmHud);
+    }
+    private void RenderRhythmHud()
+    {
+        if (rhythmHud==null) return;
+        rhythmHud.IsVisible=config.RhythmEnabled && rhythmShown && barVisible && objects.LocalPlayer!=null && !gameGui.GameUiHidden;
+        if (!rhythmHud.IsVisible) return;
+        var deck=RhythmDeck();
+        rhythmHud.Render(rhythm,config.RhythmController,deck.Length>0 ? deck[Math.Clamp(rhythmCard,0,deck.Length-1)].Name : "Connect your Lua deck",
+            rhythmMusic,rhythmClock.Bpm,weave.Runes.Count,RhythmApproach,rhythmClock.Energy,config.RhythmUsePiano);
     }
     private void SuspendRhythm()
     {
@@ -67,6 +127,29 @@ public sealed partial class Plugin
         rhythmAvailable = eligible && config.RhythmEnabled;
         if (!rhythmAvailable) { SuspendRhythm(); return; }
         var now = RhythmNow;
+        if (config.RhythmUsePiano && Environment.TickCount64-timelinePoll>=250) {
+            timelinePoll=Environment.TickCount64;
+            try {
+                var json=pi.GetIpcSubscriber<double,string>("XivPiano.RhythmTimeline.v1").InvokeFunc(30);
+                if (json.Length<=32768) {
+                    using var doc=JsonDocument.Parse(json);var x=doc.RootElement;
+                    if (x.GetProperty("version").GetInt32()==1) {
+                        var stream=x.GetProperty("streamId").GetInt64();
+                        var playing=x.GetProperty("playing").GetBoolean();
+                        var position=x.GetProperty("positionSeconds").GetDouble();
+                        if (songStream!=0 && (songStream!=stream || !playing) && rhythm.Active) SuspendRhythm();
+                        if (songStream==stream && songPlaying && playing && Math.Abs(position-(songPosition+Math.Max(0,now-songSampleAt)))>.75 && rhythm.Active)
+                            SuspendRhythm();
+                        songStream=stream;songPlaying=playing;songReady=x.GetProperty("ready").GetBoolean();
+                        songPosition=position;songSampleAt=now;
+                        var pulses=x.GetProperty("pulses");
+                        if (pulses.GetArrayLength()<=128)
+                            futurePulses=pulses.EnumerateArray().Select(p=>new FuturePulse(p.GetProperty("seconds").GetDouble(),p.GetProperty("strength").GetSingle()))
+                                .Where(p=>double.IsFinite(p.Seconds)&&float.IsFinite(p.Strength)).OrderBy(p=>p.Seconds).ToArray();
+                    }
+                }
+            } catch { songReady=false;futurePulses=[];if (rhythmSongChart && rhythm.Active) SuspendRhythm(); }
+        }
         if (config.RhythmUsePiano && Environment.TickCount64 - rhythmPoll >= 40) {
             rhythmPoll = Environment.TickCount64;
             try {
@@ -88,14 +171,15 @@ public sealed partial class Plugin
                     }
                 }
             } catch { /* Piano is optional; never start, pause or change its volume. */ }
-            rhythmMusic = rhythmClock.MusicFresh(now) ? rhythmClock.Source : "Piano unavailable / paused · tempo guide";
+            rhythmMusic = rhythmSongChart && songReady ? "Piano · future song chart" : rhythmClock.MusicFresh(now) ? rhythmClock.Source+" · tempo guide" : "Piano unavailable / paused · tempo guide";
         } else if (!config.RhythmUsePiano) rhythmMusic = rhythmClock.Source;
         rhythm.LatencyMs = config.RhythmLatencyMs;
     }
     private void TickRhythm()
     {
         if (!config.RhythmEnabled || !rhythmAvailable) return;
-        rhythm.Tick(RhythmNow);
+        var misses=rhythm.Misses;rhythm.Tick(RhythmNow);
+        if (rhythm.Misses>misses && MusicTimes(rhythm.Notes.Length-rhythm.Cursor,.5) is { } retry) rhythm.Rechart(retry);
         if (rhythm.Completed && !rhythmQueued && rhythm.Target is { } spell) {
             rhythmQueued = true;
             if (weave.Add(spell.Phrase, spell.Id)) {
@@ -123,124 +207,23 @@ public sealed partial class Plugin
     private void RhythmFeedback(RhythmRound.Grade grade)
     {
         if (config.RhythmSound && grade is RhythmRound.Grade.Perfect or RhythmRound.Grade.Great or RhythmRound.Grade.Good)
-            rhythmSound.Play(rhythm.Notes[Math.Max(0, rhythm.Cursor - 1)].Lane, config.RhythmVolume);
+            rhythmSound.Play(rhythm.Notes[Math.Max(0, rhythm.Cursor - 1)].Lane%4, config.RhythmVolume);
     }
     private bool RhythmController(uint pressed, long inputTime)
     {
         if (!RhythmPadOwned) return false;
         if ((pressed & (32768u | 16384u)) != 0) { SuspendRhythm(); StartPlayback((pressed & 16384) != 0); return true; }
-        if ((pressed & (4u | 8u)) != 0) {
-            var deck = RhythmDeck();
-            if (deck.Length > 0) {
-                rhythmCard = (rhythmCard + ((pressed & 4) != 0 ? deck.Length - 1 : 1)) % deck.Length;
-                rhythm.Stop(); BeginRhythm();
-            }
+        if ((pressed & (uint)(GamepadButtonsFlags.L1|GamepadButtonsFlags.R1)) != 0) {
+            ChangeRhythmSpell((pressed & (uint)GamepadButtonsFlags.L1)!=0 ? -1 : 1);
             return true;
         }
         if (!rhythm.Active) return true;
-        var face = pressed & 240;
+        var face = pressed & 255;
         if (face != 0 && (face & (face - 1)) == 0) {
-            var lane = face switch { 16 => 0, 128 => 1, 32 => 2, 64 => 3, _ => -1 };
+            var lane = face switch { 4 => 0, 1 => 1, 2 => 2, 8 => 3, 16 => 4, 128 => 5, 32 => 6, 64 => 7, _ => -1 };
             var at = inputTime > 0 ? inputTime / 1000d : RhythmNow;
             RhythmFeedback(rhythm.PressLane(lane, at));
         }
         return true;
-    }
-    private void DrawRhythm()
-    {
-        if (!config.RhythmEnabled || !barVisible || gameGui.GameUiHidden) return;
-        ImGui.SetNextWindowSize(new Vector2(560, 570), ImGuiCond.FirstUseEver);
-        ImGui.SetNextWindowSizeConstraints(new Vector2(440, 440), new Vector2(900, 900));
-        if (!ImGui.Begin("GRIMOIRE / RHYTHM###XivSpellRhythm", ImGuiWindowFlags.NoNavInputs)) { ImGui.End(); return; }
-        ImGui.TextColored(new Vector4(.6f,.88f,1,1), "SPELLSTRINGS");
-        ImGui.SameLine(); ImGui.TextDisabled($"{rhythmMusic} · {rhythmClock.Bpm:F0} BPM");
-        var padMode = config.RhythmController;
-        if (ImGui.Checkbox("Controller", ref padMode)) { config.RhythmController = padMode; SuspendRhythm(); pi.SavePluginConfig(config); }
-        ImGui.SameLine();
-        var usePiano = config.RhythmUsePiano;
-        if (ImGui.Checkbox("Follow Piano", ref usePiano)) { config.RhythmUsePiano = usePiano; pi.SavePluginConfig(config); }
-        ImGui.SameLine();
-        if (ImGui.Button("Tap beat")) { config.RhythmUsePiano = false; rhythmClock.Tap(RhythmNow); }
-        var deck = RhythmDeck();
-        if (deck.Length > 0) {
-            ImGui.BeginDisabled(rhythm.Active);
-            if (ImGui.ArrowButton("previous-spell", ImGuiDir.Left)) { rhythm.Stop(); rhythmCard = (rhythmCard + deck.Length - 1) % deck.Length; }
-            ImGui.SameLine(); ImGui.TextUnformatted(deck[Math.Clamp(rhythmCard,0,deck.Length-1)].Name); ImGui.SameLine();
-            if (ImGui.ArrowButton("next-spell", ImGuiDir.Right)) { rhythm.Stop(); rhythmCard = (rhythmCard + 1) % deck.Length; }
-            ImGui.EndDisabled();
-            ImGui.SameLine();
-            if (rhythm.Active) { if (ImGui.Button("Pause")) { SuspendRhythm(); InterruptWeave("Rhythm paused", true); } }
-            else if (ImGui.Button(rhythm.State == RhythmRound.Phase.Paused ? "Resume" : "Weave")) BeginRhythm();
-            ImGui.SameLine(); if (ImGui.Button("Cast + move  >")) { SuspendRhythm(); StartPlayback(); }
-        }
-        ImGui.TextUnformatted($"{rhythm.Score:N0}   {rhythm.Combo}x COMBO   BEST {rhythm.BestCombo}   {rhythm.Stars}/5 STARS");
-        ImGui.SameLine(); ImGui.TextDisabled($"{rhythm.Accuracy:P0}  ·  {weave.Runes.Count} runes queued");
-        ImGui.TextColored(new Vector4(.94f,.89f,.65f,1), rhythm.Target == null ? "Choose a spell, then weave to the music." : rhythm.Target.Phrase.ToUpperInvariant());
-        var origin = ImGui.GetCursorScreenPos();
-        var size = new Vector2(ImGui.GetContentRegionAvail().X, Math.Max(160, ImGui.GetContentRegionAvail().Y - 112));
-        var draw = ImGui.GetWindowDrawList();
-        static uint Color(Vector4 c) => ImGui.ColorConvertFloat4ToU32(c);
-        draw.AddRectFilled(origin, origin + size, Color(new(.025f,.035f,.075f,.96f)), 12);
-        var laneWidth = size.X / 4;
-        var hitY = origin.Y + size.Y - 44;
-        var now = rhythm.State == RhythmRound.Phase.Paused ? rhythm.PausedAt : RhythmNow;
-        var preview = rhythmClock.Period * 4;
-        if (rhythmClock.MusicFresh(RhythmNow)) for (var band = 0; band < rhythmSpectrum.Length; band++) {
-            var width = size.X / rhythmSpectrum.Length;
-            var left = origin.X + band * width;
-            draw.AddRectFilled(new(left,origin.Y + size.Y),new(left + width - 2,origin.Y + size.Y - rhythmSpectrum[band] * size.Y * .5f),
-                Color(RhythmColors[band / 8] with { W = .10f }));
-        }
-        for (var lane = 0; lane < 4; lane++) {
-            var x = origin.X + laneWidth * lane;
-            draw.AddLine(new(x, origin.Y + 8), new(x, origin.Y + size.Y - 4), Color(new(.3f,.36f,.5f,.3f)));
-            var c = RhythmColors[lane];
-            draw.AddRectFilled(new(x + 5, hitY - 10), new(x + laneWidth - 5, hitY + 10), Color(c with { W = .15f + rhythmClock.Energy * .15f }), 5);
-            draw.AddLine(new(x + 5,hitY), new(x + laneWidth - 5,hitY), Color(c), 3);
-            var choice = rhythm.Cursor < rhythm.Notes.Length ? rhythm.Notes[rhythm.Cursor].Choices[lane] : '\0';
-            var text = choice == ' ' ? "SPACE" : choice == 0 ? "" : char.ToUpperInvariant(choice).ToString();
-            draw.AddText(new(x + 14, hitY + 14), Color(c), text);
-        }
-        for (var i = rhythm.Cursor; i < rhythm.Notes.Length; i++) {
-            var note = rhythm.Notes[i];
-            var remaining = note.Due - now;
-            if (remaining > preview || remaining < -.4) continue;
-            var y = hitY - (float)(remaining / preview) * (size.Y - 60);
-            var x = origin.X + note.Lane * laneWidth;
-            var c = RhythmColors[note.Lane];
-            draw.AddRectFilled(new(x + 8,y - 15), new(x + laneWidth - 8,y + 15), Color(c with { W = .9f }), 8);
-            var text = note.Letter == ' ' ? "SPACE" : char.ToUpperInvariant(note.Letter).ToString();
-            var fontSize = ImGui.GetFontSize() * 1.5f;
-            draw.AddText(ImGui.GetFont(), fontSize, new(x + laneWidth / 2 - ImGui.CalcTextSize(text).X * .75f,y - fontSize / 2), Color(new(.025f,.04f,.08f,1)), text);
-        }
-        if (now - rhythm.LastFeedback < .7) {
-            var good = rhythm.LastGrade is RhythmRound.Grade.Perfect or RhythmRound.Grade.Great or RhythmRound.Grade.Good;
-            var text = rhythm.LastGrade.ToString().ToUpperInvariant() + (good ? $"  {rhythm.LastErrorMs:+0;-0;0}ms" : " · keep your letter");
-            draw.AddText(origin + new Vector2(18,14), Color(good ? new(.5f,1,.8f,1) : new(1,.63f,.5f,1)), text);
-        }
-        if (rhythm.Active && rhythm.Cursor == 0 && rhythm.Notes.Length > 0 && rhythm.Notes[0].Due - now > rhythmClock.Period) {
-            var count = Math.Ceiling((rhythm.Notes[0].Due - now) / rhythmClock.Period);
-            draw.AddText(origin + new Vector2(size.X / 2 - 28, size.Y / 2), Color(new(1,1,1,1)), $"IN {count:0}");
-        }
-        ImGui.Dummy(size);
-        if (config.RhythmController) {
-            for (var lane = 0; lane < 4; lane++) {
-                if (lane > 0) ImGui.SameLine();
-                ImGui.TextColored(RhythmColors[lane], RhythmButtons[lane]);
-            }
-            ImGui.TextDisabled("D-pad Left/Right: spell · R3: cast + move · both sticks: weave / pause");
-        } else ImGui.TextDisabled("Type each letter as it crosses the line. Space is a note too.");
-        ImGui.TextWrapped(rhythm.State == RhythmRound.Phase.Ready ? "WOVEN! > casts while you move · i weaves another · Escape keeps your queue." :
-            rhythm.State == RhythmRound.Phase.Paused ? "PAUSED · Resume keeps your place. Escape returns movement." :
-            "Esc pauses and releases movement. > casts the prepared runes. No rhythm hit casts a spell.");
-        if (ImGui.TreeNode("Timing + sound")) {
-            if (ImGui.SliderFloat("Input offset (ms)", ref config.RhythmLatencyMs, -250, 250)) pi.SavePluginConfig(config);
-            if (ImGui.SliderFloat("Guide BPM", ref config.RhythmBpm, 50, 220)) { rhythmClock.SetTempo(config.RhythmBpm, now); pi.SavePluginConfig(config); }
-            if (ImGui.Checkbox("Plucked hit sounds", ref config.RhythmSound)) pi.SavePluginConfig(config);
-            if (ImGui.SliderFloat("Hit volume", ref config.RhythmVolume, 0, .3f)) pi.SavePluginConfig(config);
-            ImGui.TextDisabled("Positive offset compensates late audio/display. Tempo changes apply next round.");
-            ImGui.TreePop();
-        }
-        ImGui.End();
     }
 }

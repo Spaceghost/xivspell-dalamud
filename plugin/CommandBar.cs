@@ -102,6 +102,7 @@ public sealed partial class Plugin
     private void StartPlayback(bool restart = false)
     {
         SuspendRhythm();
+        rhythmShown=false;
         autoFollow.Authorize();
         // A stale Enter-to-compose request must not reclaim the keyboard on
         // the frame after an explicit . or > command.
@@ -141,6 +142,7 @@ public sealed partial class Plugin
                     CardInput(":nvim " + id, "editor");
                 } };
                 hudController.AddNode(hud);
+                CreateRhythmHud();
             }
             var player = objects.LocalPlayer;
             var available = barVisible && player != null && !player.IsDead && !gameGui.GameUiHidden &&
@@ -149,7 +151,7 @@ public sealed partial class Plugin
             hud.IsVisible = available;
             keyboard.Install();
             keyboard.Enabled = available;
-            if (!available) { SuspendRhythm(); ReadController(false); keyboard.PollBackspace(Environment.TickCount64, false); InterruptWeave("Spellcasting suspended"); lastPlayerPosition = null; return; }
+            if (!available) { SuspendRhythm(); if (rhythmHud!=null) rhythmHud.IsVisible=false; ReadController(false); keyboard.PollBackspace(Environment.TickCount64, false); InterruptWeave("Spellcasting suspended"); lastPlayerPosition = null; return; }
             GetWindowThreadProcessId(GetForegroundWindow(), out var foreground);
             var focused = foreground == (uint)Environment.ProcessId;
             var otherText = editorOpen || RaptureAtkModule.Instance()->IsTextInputActive() || Dalamud.Bindings.ImGui.ImGui.GetIO().WantTextInput || visible;
@@ -207,6 +209,7 @@ public sealed partial class Plugin
             // A lost result is an unknown outcome: retain the cursor and require explicit continuation.
             if (weave.InFlight != null && (Environment.TickCount64 - weaveSentAt > 35000 || Environment.TickCount64 - lastRuntimePoll >= 3000)) InterruptWeave("Spellbook disconnected");
             hud.Render(weave, cards, data, armed, Environment.TickCount64 - lastRuntimePoll < 3000, conditions[Dalamud.Game.ClientState.Conditions.ConditionFlag.InCombat], RuneTarget, ReadCooldown, composer);
+            RenderRhythmHud();
         } catch (Exception ex) { log.Error(ex, "Spell weave update"); InterruptWeave("Weave paused"); }
     }
 

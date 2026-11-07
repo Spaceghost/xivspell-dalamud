@@ -34,31 +34,36 @@ and model. Do not copy another player's configuration or credentials.
 
 ## Rhythm weaving
 
-`/xivspell rhythm on` opens **Spellstrings**, a four-lane letter highway. Choose a
-spell, wait through the four-beat count-in, and type each letter as it crosses the
-strike line. Spaces are notes too. Perfect/Great/Good judgments build combos,
-multipliers and stars. Mistakes keep the missing letter and give it a later beat;
-they never queue a partly spelled spell.
+`/xivspell rhythm on` opens **Spellstrings** in the existing native spell HUD.
+Two perspective lanes approach from the distance: left and right. Keyboard notes
+show the exact letter at its hand/column position; controller notes show the
+D-pad direction on the left or face button on the right, with the letter it types.
+Each complete spell queues one rune. Misses retain the untyped letter.
 
-For controllers, use `/xivspell rhythm pad`. Press both sticks to weave/pause,
-use D-pad Left/Right to choose a spell, and match the letter to the coloured face
-button. The other letters come from available spell-name completions, with
-distinct decoys filling the remaining lanes. R3 casts the prepared queue and
-releases the controller for movement; L3 repeats it. Keyboard mode uses `>` to
-cast and move, `.` to repeat, `i` to weave another, and Escape to pause. Normal
-spell weaving remains available with `/xivspell rhythm off`.
+For controllers use `/xivspell rhythm pad`: both sticks weave/pause, L1/R1 choose
+a spell, R3 casts and releases movement, and L3 repeats. The eight button choices
+come from available spell-name completions, with distinct decoys filling spare
+buttons. Keyboard mode uses `>` to cast and move, `.` to repeat, `i` to weave
+another, and Escape to pause. Native buttons also choose spells, pause/resume,
+change input mode, cast, select Piano/guide timing and tap a beat.
 
-Piano's optional `XivPiano.AudioFeatures.v1` feed supplies a live spectrum, energy
-and an **estimated** beat grid. It is not a pre-authored song chart or guaranteed
-beat detection. Let it learn a few pulses before starting a round. With game
-music, turn off Follow Piano and tap **Tap beat** along with the music, or set
-`/xivspell rhythm tempo 120`. Chart tempo is fixed for each round. The timing
-panel adjusts input offset and quiet plucked hit sounds, mixed through your
-default output without changing music playback or volume.
+Piano's optional `XivPiano.RhythmTimeline.v1` feed supplies up to 30 seconds of
+future song onsets from a separate background decode of its downloaded song.
+The chart uses those future timings when enough pulses are available; an
+eight-second perspective approach makes the exact keys visible well in advance.
+These are measured energy onsets, not pitch transcription or guaranteed musical
+beats. A missing/unfinished map uses a clearly labelled tempo guide. Piano's
+`AudioFeatures.v1` feed still supplies live energy and a beat estimate.
 
-The round queues a rune only after every letter was hit. Casting requires a
-separate explicit command, so preparing a musical spell cannot cast it or move
-the character. Losing focus, cutscenes and other text editors pause the round.
+For game music, select GUIDE and tap the native **TAP BEAT** button, or set
+`/xivspell rhythm tempo 120`. Other tuning commands are `rhythm offset 100`
+(milliseconds), `rhythm speed 1` or `2`, `rhythm sound on|off`, and `rhythm volume
+0.1`. Quiet synthesized plucks mix through the default output without changing
+music playback or volume. Use `/xivspell rhythm off` for normal spell weaving.
+
+Casting remains a separate explicit command; musical input cannot cast a spell
+or move the character. Focus loss, cutscenes and other text input pause the round.
+The existing queue and casting/control mode are preserved across plugin reloads.
 
 ## Development
 
