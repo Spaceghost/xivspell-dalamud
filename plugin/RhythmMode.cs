@@ -67,8 +67,24 @@ public sealed partial class Plugin
         else { weave.Hint = "rhythm on|off|keyboard|piano|tap|tempo BPM"; return true; }
         pi.SavePluginConfig(config); return true;
     }
-    private RhythmRound.Spell[] RhythmDeck() => cards.Where(c => c.Phrase.Length is > 0 and <= 64)
-        .Select(c => new RhythmRound.Spell(c.Id, c.Phrase, c.Name)).ToArray();
+    // Full phrases first, then each card's id, aliases and grimoire expansions
+    // ("sc" → Summon Carbuncle), so long multiword spells have a short rhythm word.
+    // A shortcut never shadows another card's full phrase.
+    private RhythmRound.Spell[] RhythmDeck()
+    {
+        var usable = cards.Where(c => c.Phrase.Length is > 0 and <= 64).ToArray();
+        var words = usable.Select(c => new RhythmRound.Spell(c.Id, Normalize(c.Phrase), c.Name, c.Phrase)).ToList();
+        var taken = words.Select(w => w.Phrase).ToHashSet();
+        void Add(string word, Card card)
+        {
+            word = Normalize(word);
+            if (word.Length is > 0 and <= 64 && taken.Add(word)) words.Add(new(card.Id, word, card.Name, card.Phrase));
+        }
+        foreach (var card in usable) { Add(card.Id, card); foreach (var alias in card.Aliases ?? []) Add(alias, card); }
+        foreach (var shortcut in expansions.Keys.Order(StringComparer.Ordinal))
+            if (ResolveRune(shortcut) is { } rune && usable.FirstOrDefault(c => c.Id == rune.CardId) is { } card) Add(shortcut, card);
+        return words.ToArray();
+    }
     private void BeginRhythm()
     {
         if (disposed) return;
@@ -194,7 +210,7 @@ public sealed partial class Plugin
     private void QueueRhythmSpell()
     {
         if (!rhythm.Completed || rhythm.Target is not { } spell) return;
-        if (!weave.Add(spell.Phrase,spell.Id)) { SuspendRhythm(); return; }
+        if (!weave.Add(spell.Command ?? spell.Phrase,spell.Id)) { SuspendRhythm(); return; }
         rhythmQueued=true;rhythm.TakeCompleted(RhythmNow);
         CancelWeaveTicket(weave.Interrupt("Spell queued · keep spelling, or > cast + move",false));
         if (weave.Runes.Count>=SpellWeave.Capacity) {
@@ -236,7 +252,7 @@ public sealed partial class Plugin
         }
         if (input.Type==SpellKeyboard.Kind.Commit) { rhythm.Commit(at);QueueRhythmSpell();return true; }
         if (input.Type==SpellKeyboard.Kind.Complete) {
-            rhythm.Notice("Type any complete spell · Enter queues a shorter matching name",RhythmNow);return true;
+            rhythm.Notice("Type a spell, its id or a shortcut like SC · Enter queues an exact shorter name",RhythmNow);return true;
         }
         return false;
     }

@@ -62,7 +62,9 @@ public sealed class RhythmClock
 // Empty beats are optional; only an unfinished word can be broken by a miss.
 public sealed class RhythmRound
 {
-    public sealed record Spell(string Id, string Phrase, string Name);
+    // Phrase is the word typed on the beats; Command is the card's canonical
+    // phrase queued when a shortcut (id, alias or expansion) completes.
+    public sealed record Spell(string Id, string Phrase, string Name, string? Command = null);
     public sealed record Note(double Due);
     public enum Phase { Idle, Playing, Paused, Ready }
     public enum Grade { None, Perfect, Great, Good, Early, Wrong, Miss }
@@ -95,7 +97,7 @@ public sealed class RhythmRound
         if (!double.IsFinite(firstBeat) || !double.IsFinite(beatPeriod) || beatPeriod is < .12 or > 1.5) return false;
         deck = spells.Where(s => !string.IsNullOrWhiteSpace(s.Id) && !string.IsNullOrWhiteSpace(s.Phrase)
             && s.Phrase.Length <= 64 && !s.Phrase.Any(char.IsControl))
-            .Select(s => s with { Phrase = s.Phrase.ToLowerInvariant() }).ToArray();
+            .Select(s => s with { Phrase = s.Phrase.ToLowerInvariant() }).DistinctBy(s => s.Phrase).ToArray();
         if (deck.Length == 0) return false;
         period = beatPeriod; Prefix = LastSpell = ""; Target = null;
         Score = Combo = Hits = Misses = 0; lastInput = LastFeedback = double.NegativeInfinity;

@@ -62,6 +62,15 @@ Check(r.Notes[0].Due==before && r.Notes.Select(n=>n.Due).SequenceEqual(r.Notes.S
 Check(!r.Start(deck,1,double.NaN),"Malformed timing is rejected");
 Check(!r.Start([deck[0] with { Phrase="\n" }],1,.5),"Control characters cannot become spells");
 
+RhythmRound.Spell[] summons=[new("carbuncle","summon carbuncle","Summon Carbuncle","summon carbuncle"),new("ruby","summon ruby","Summon Ruby","summon ruby"),
+    new("carbuncle","sc","Summon Carbuncle","summon carbuncle"),new("carbuncle","carbuncle","Summon Carbuncle","summon carbuncle"),new("ruby","summon ruby","Ruby duplicate","x")];
+r.Start(summons,30,.5);r.Press('s',30);r.Press('c',30.5);
+Check(r.Completed && r.Target?.Id=="carbuncle" && r.Target.Command=="summon carbuncle","A two-letter shortcut queues the full multiword spell");
+r.TakeCompleted(30.5);foreach(var (ch,i) in "carbuncle".Select((ch,i)=>(ch,i))) r.Press(ch,31+i*.5);
+Check(r.Completed && r.Target?.Command=="summon carbuncle","A card id is a rhythm word for its spell");
+r.TakeCompleted(35.5);r.Press('s',36);r.Press('u',36.5);
+Check(r.Matches.Count(m=>m.Phrase=="summon ruby")==1 && r.Matches.First(m=>m.Phrase=="summon ruby").Name=="Summon Ruby","Duplicate words keep the first (full phrase) entry");
+
 var weave=new SpellWeave();
 weave.Add("ruin","ruin");weave.Interrupt("Queued");
 Check(weave.Next==null && weave.InFlight==null,"Completing rhythm spelling never casts");

@@ -102,7 +102,7 @@ internal sealed class NativeRhythmHud : OverlayNode
         word.FontSize=round.Prefix.Length>23 ? 18u : 25u;
         Label(word,136,21,textWidth,round.Prefix.Length>0 ? round.Prefix.ToUpperInvariant()+"│" : "◇  weave any spell");
         word.TextColor=round.Prefix.Length>0 ? White : new(.72f,.83f,.86f,1);
-        var candidates=round.Prefix.Length>0 ? string.Join(" / ",round.Matches.Take(3).Select(s=>s.Name)) : "Type while the pulse is inside the shaded band.";
+        var candidates=round.Prefix.Length>0 ? string.Join(" / ",round.Matches.Select(s=>s.Name).Distinct().Take(3)) : "Type while the pulse is inside the shaded band.";
         Label(matches,136,57,textWidth,WeavePresentation.Clip(candidates,(int)(textWidth/6)));
         Label(feedback,136,80,textWidth,WeavePresentation.Clip(recent ? round.Feedback : "Center of the band = perfect timing",(int)(textWidth/6)));
         feedback.TextColor=recent && fail ? Red : Cyan;
