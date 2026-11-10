@@ -7,6 +7,7 @@ local function lookup(s)
 end
 local function compile(s) return assert(L.compile(s, lookup)) end
 assert(compile('on focus physick').call.target == 'focus')
+assert(compile('on friendly physick').call.target == 'friendly')
 assert(compile('on target ruin').call.target == 'current')
 assert(compile('on "Dusk Bat" ruin').call.target == 'name:Dusk Bat')
 assert(compile('on party8 physick').call.target == 'party8')

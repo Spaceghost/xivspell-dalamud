@@ -39,7 +39,7 @@ internal static class WeavePresentation
     internal static bool HasLogic(string text) => Regex.IsMatch(text, @"\b(if|then|else|and|or|not)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     internal static string Clip(string value, int length) => value.Length <= length ? value : value[..(length - 1)] + "…";
     internal static string TargetLabel(string target) => target switch {
-        "self" => "SELF", "current" => "TARGET", "focus" => "FOCUS", "targetOfTarget" => "TOT",
+        "self" => "SELF", "friendly" => "ALLY/SELF", "current" => "TARGET", "focus" => "FOCUS", "targetOfTarget" => "TOT",
         "nearest" => "NEAREST", "nearestmob" => "NEAR MOB", "healer" => "HEALER", "lowest" => "LOW HP", "role" => "AUTO ROLE",
         _ when target.StartsWith("name:") => "NAMED", _ => target.ToUpperInvariant(),
     };

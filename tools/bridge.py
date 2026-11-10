@@ -239,6 +239,8 @@ def local_tools():
         entry('spellbook_follow', 'Submit role-aware or explicitly targeted following through the spell runtime. In practice mode this only rehearses.',
             {'target': {'type': 'string', 'enum': ['role', 'current', 'focus', 'party1', 'party2', 'party3', 'party4', 'party5', 'party6', 'party7', 'party8']}}, ['target']),
         entry('spellbook_stop_follow', 'Stop XivSpell-owned following immediately. Leaves all controller mappings alone.'),
+        entry('spellbook_target', 'Choose a target for the next completed native spell, including rhythm spelling. Never casts or changes targets of already queued runes.',
+            {'target': {'type':'string','enum':['card','friendly','self','current','focus','tank','healer','lowest','targetOfTarget','enemy','nearest','nearestmob','mob','boss','ally','role','party1','party2','party3','party4','party5','party6','party7','party8']}}, ['target']),
         entry('spellbook_disarm', 'Switch the native bridge to practice and cancel XivSpell-owned movement.'),
         entry('spellbook_expand', 'Save a short expansion for Tab completion and command invocation. The running spellbook reloads it automatically.',
             {'short': {'type': 'string', 'maxLength': 48}, 'command': {'type': 'string', 'maxLength': 255}}, ['short', 'command']),
@@ -274,6 +276,8 @@ def mcp_local(name, args, deck, game):
         return game.spell({'method': 'command_result', 'requestId': args['requestId']})
     if name == 'spellbook_stop_follow':
         return game.spell({'method': 'unfollow'})
+    if name == 'spellbook_target':
+        return game.spell({'method':'weave_target','target':args['target']})
     if name == 'spellbook_disarm':
         return game.spell({'method': 'disarm'})
     if name == 'spellbook_expand':
@@ -415,7 +419,7 @@ def main():
     parser.add_argument('--container', help='Run transport beside the game inside this Incus container')
     parser.add_argument('--config')
     parser.add_argument('--deck', type=Path, default=ROOT / 'cards')
-    parser.add_argument('command', choices=['worker', 'rpc', 'tool', 'catalogue', 'snapshot', 'cast', 'follow', 'unfollow', 'disarm', 'cards', 'events', 'feedback', 'input', 'compiled', 'translated', 'cast_result', 'target', 'speech', 'speech_state', 'editor_result', 'editor_open', 'editor_command', 'visuals', 'command_result', 'rhythm_status', 'rhythm_configure', 'generate', 'mcp'])
+    parser.add_argument('command', choices=['worker', 'rpc', 'tool', 'catalogue', 'snapshot', 'cast', 'follow', 'unfollow', 'disarm', 'cards', 'events', 'feedback', 'input', 'compiled', 'translated', 'cast_result', 'target', 'speech', 'speech_state', 'editor_result', 'editor_open', 'editor_command', 'visuals', 'command_result', 'rhythm_status', 'rhythm_configure', 'weave_target', 'generate', 'mcp'])
     parser.add_argument('payload', nargs='?', default='{}')
     args = parser.parse_args()
     try:

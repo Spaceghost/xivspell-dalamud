@@ -93,8 +93,20 @@ Each cards/*.lua buffer returns a SpellCard. A minimum example:
       end,
     }
 <
-Targets: current, self, focus, targetOfTarget, party1..party8. Casting on a
+Targets: current, friendly, self, focus, targetOfTarget, party1..party8. Casting on a
 focus or party member does not change your selected enemy target.
+Physick defaults to friendly: the selected living player/party ally, otherwise
+self. For deliberate mixed queues, use the native TARGET button to choose a
+party slot, focus, tank or lowest-HP ally for the next completed spell only.
+The same picker offers enemy, nearest, trash and marked-boss aims. It pauses
+an unfinished rhythm word while open. Keys 1–8 select party slots; Escape
+retains its usual stop behavior. The choice stays on its rune through repeat
+and reload. Later target choices do not rewrite earlier queued spells.
+FOCUS SELECTED pins a teammate, SELECT ENEMY acquires the closest hostile,
+and MARK BOSS distinguishes boss/add aims. These buttons never cast.
+In ordinary weaving, on party2 physick / on focus physick / on lowest physick /
+on targetOfTarget physick / on nearest ruin + Enter provide the text forms.
+In rhythm mode, use TARGET and spell the word normally.
 
 ctx:cast(actionId, target?) emits one action request. ctx.state is persistent
 for this card during the runtime session. It commits only after a successful
@@ -215,6 +227,7 @@ EDITOR AND LSP                                               *xivspell-lsp*
 
     :Spellbook          Open the source index; Enter/e edits a Lua buffer.
     :SpellEdit ruin     Edit a named buffer directly.
+    :SpellTarget party2 Aim the next completed native spell at party slot 2.
     :SpellSync          Publish current icons, names, expansions and source.
     :SpellApi           Refresh generated types from the live MCP catalogue.
     :SpellConfig        Reload personal expansions/hooks.
@@ -272,7 +285,8 @@ The additive stdio MCP server forwards the original XivMcp catalogue and adds
 spellbook_list, spellbook_read, spellbook_save, spellbook_status,
 spellbook_sessions, spellbook_api, spellbook_invoke, spellbook_result,
 spellbook_follow, spellbook_stop_follow, spellbook_disarm, spellbook_expand,
-and spellbook_hooks. Start it with:
+spellbook_hooks, and spellbook_target. Target selection never invokes a spell.
+Start it with:
 >
     python3 tools/bridge.py --container ffxiv mcp
 <

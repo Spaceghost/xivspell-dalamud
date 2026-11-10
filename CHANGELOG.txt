@@ -1,3 +1,11 @@
+0.1.0.6
+- Physick heals your selected living friendly player/teammate, with self fallback.
+- Native TARGET popover adds named party slots, focus, tank, lowest HP and enemy aims.
+- Target choices apply to one completed spell and survive queueing, repeats and reloads.
+- Rhythm spelling pauses while choosing; party keys 1–8 and visible focus/boss/enemy controls aid targeting.
+- Explicit boss/add aims retain the encounter anchor; accidental encounter switches still stop playback.
+- Add :SpellTarget, weave_target IPC/HTTP and spellbook_target MCP without casting side effects.
+
 0.1.0.5
 - Embed the soft reverse pulse beside the word in the existing native Grimoire HUD.
 - Shade the entire accepted timing band instead of depicting a tiny target line.

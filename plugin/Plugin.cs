@@ -40,7 +40,7 @@ public sealed class Config : IPluginConfiguration
 }
 
 public sealed record Card(string Id, string Name, uint Action, string Target, string Phrase, string Source = "", string[]? Aliases = null);
-public sealed record CardEvent(long Sequence, string Card, string Kind, long Time, double Seconds, string RequestId);
+public sealed record CardEvent(long Sequence, string Card, string Kind, long Time, double Seconds, string RequestId, string? Target = null);
 
 public sealed partial class Plugin : IDalamudPlugin
 {
@@ -99,6 +99,7 @@ public sealed partial class Plugin : IDalamudPlugin
         pi.SavePluginConfig(config);
         commands.AddHandler("/xivspell", new CommandInfo((_, args) => {
             if (RhythmCommand(args)) { }
+            else if (args == "targets") ToggleWeaveTargets();
             else if (args == "off") { SuspendRhythm(); InterruptWeave("Disarmed", true); armed = false; StopFollowing("Disarmed"); }
             else if (args is "autofollow" or "autofollow on" or "autofollow off") {
                 config.AutoFollow = args == "autofollow on" || (args == "autofollow" && !config.AutoFollow);
@@ -135,6 +136,7 @@ public sealed partial class Plugin : IDalamudPlugin
         public string Method { get; set; } = "snapshot";
         public uint Action { get; set; }
         public string Target { get; set; } = "current";
+        public bool TargetExplicit { get; set; }
         public string RequestId { get; set; } = "";
         public Card[]? Cards { get; set; }
         public float Range { get; set; } = 15;
@@ -154,6 +156,7 @@ public sealed partial class Plugin : IDalamudPlugin
         "current" => targets.Target,
         "self" => objects.LocalPlayer,
         "focus" => targets.FocusTarget,
+        "friendly" => ResolveFriendly(),
         "targetOfTarget" => targets.Target == null ? null : objects.FirstOrDefault(o => o.EntityId == targets.Target.TargetObjectId),
         "role" => ResolveRoleTarget(),
         "enemy" => ResolveEnemy(false),
@@ -179,6 +182,7 @@ public sealed partial class Plugin : IDalamudPlugin
 
     private unsafe object Dispatch(Request r)
     {
+        if (r.Method == "weave_target") { ChooseWeaveTarget(r.Target); return new { nextTarget = weave.NextTarget, message = weave.Hint }; }
         if (r.Method == "rhythm_configure") {
             if (r.Text is not ("on" or "off" or "pad" or "keyboard" or "piano" or "tap"))
                 throw new InvalidOperationException("Rhythm configuration accepts on, off, pad, keyboard, piano or tap; it never casts");
@@ -283,7 +287,7 @@ public sealed partial class Plugin : IDalamudPlugin
         if (r.Method == "snapshot") return new { armed, following, followTarget, followRange, autoFollow = config.AutoFollow, autoFollowAuthorized = autoFollow.Authorized, last, cards, player = objects.LocalPlayer?.Name.TextValue,
             job = objects.LocalPlayer?.ClassJob.RowId, level = objects.LocalPlayer?.Level,
             target = targets.Target?.Name.TextValue, focus = targets.FocusTarget?.Name.TextValue,
-            weave = new { draftRevision = weave.DraftRevision, encounterActor, selectedEncounter = targetBoundary.Target, targetStopped = targetBoundary.Stopped, composer = composer.Active, keyboardInstalled = keyboard.Installed, inputMode = weave.InputMode, paused = weave.Paused, cursor = weave.Cursor, draft = weave.Draft, runes = weave.Runes, inFlight = weave.InFlight, hint = weave.Hint },
+            weave = new { draftRevision = weave.DraftRevision, nextTarget = weave.NextTarget, targetPickerOpen = WeaveTargetsOpen, encounterActor, selectedEncounter = targetBoundary.Target, targetStopped = targetBoundary.Stopped, composer = composer.Active, keyboardInstalled = keyboard.Installed, inputMode = weave.InputMode, paused = weave.Paused, cursor = weave.Cursor, draft = weave.Draft, runes = weave.Runes, inFlight = weave.InFlight, hint = weave.Hint },
             editor = new { open = editorOpen, card = editorCard, dirty = editorDirty, saving = editorSaving, message = editorMessage },
             controllerNavigation = gamepad.EnableGamepadNav,
             controllerLeftStick = new { x = gamepad.LeftStick.X, y = gamepad.LeftStick.Y },
@@ -314,11 +318,13 @@ public sealed partial class Plugin : IDalamudPlugin
             if (row.ClassJobLevel > objects.LocalPlayer.Level) throw new InvalidOperationException("Action locked by current level sync");
             var target = Resolve(r.Target) ?? throw new InvalidOperationException("Select a valid " + r.Target + " target first");
             if (r.RequestId == weave.InFlight && IsEnemy(target)) {
-                if (encounterActor != 0 && encounterActor != target.GameObjectId) {
+                var aim = TargetBoundary.AuthorizeCast(encounterActor, IsEnemy(targets.Target) ? targets.Target!.GameObjectId : 0,
+                    target.GameObjectId, r.TargetExplicit);
+                if (!aim.Allowed) {
                     InterruptWeave("Spell target changed · Enter / > continue · . restart", true);
                     throw new InvalidOperationException("Explicit continuation required for a new enemy");
                 }
-                encounterActor = target.GameObjectId;
+                encounterActor = aim.Anchor;
             }
             weave.RecordTarget(r.RequestId, r.Target, target.Name.TextValue, target.GameObjectId, adjusted);
             var castTime = ActionManager.GetAdjustedCastTime(ActionType.Action, adjusted, true);
@@ -433,14 +439,14 @@ public sealed partial class Plugin : IDalamudPlugin
         ImGui.End();
     }
 
-    private void CardInput(string id, string kind, double seconds = 0, string? requestId = null)
+    private void CardInput(string id, string kind, double seconds = 0, string? requestId = null, string? target = null)
     {
         requestId ??= Guid.NewGuid().ToString("N");
         if (kind == "command") {
             if (commandResults.Count > 128) commandResults.Clear();
             commandResults[requestId] = new { state = "queued", command = id };
         }
-        cardEvents.Enqueue(new CardEvent(++eventSequence, id, kind, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), seconds, requestId));
+        cardEvents.Enqueue(new CardEvent(++eventSequence, id, kind, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), seconds, requestId, target));
         while (cardEvents.Count > 128) cardEvents.Dequeue();
         last = "Sent " + id + " to Neovim";
     }

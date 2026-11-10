@@ -168,5 +168,29 @@ print('PASS: pending cast confirmation, movement retry and restart preserve macr
 print('PASS: native weave request identity survives Lua card invocation')
 print('PASS: deck, macro sequencing, retries, in-flight input, instruction budget and practice isolation')
 print('PASS: spell names, Tab candidates, expansions, dot repeat, hook cancellation and expansion cycles')
+spell.mode = 'practice'
+spell.transport = function(method, payload, cb) assert(method=='feedback'); cb({ok=true}) end
+assert(spell.invoke('physick',0,'target-fixture',nil,'party2'))
+assert(spell.attempts[#spell.attempts].target=='party2', 'Picker overrides the card default')
+assert(spell.invoke('.'))
+assert(spell.attempts[#spell.attempts].target=='party2', 'Runtime repetition retains a picker-selected teammate')
+assert(spell.invoke('on focus physick',0,'explicit-fixture',nil,'party2'))
+assert(spell.attempts[#spell.attempts].target=='focus', 'Explicit on TARGET syntax takes precedence over the picker')
+assert(spell.invoke('physick'))
+assert(spell.attempts[#spell.attempts].target=='friendly', 'Plain Physick uses the selected-friendly/self default')
+local aimed_event_sent = false
+spell.transport = function(method, payload, cb)
+  if method=='events' then
+    local events={}
+    if not aimed_event_sent then
+      aimed_event_sent=true;events={{kind='command',card='physick',target='party3',requestId='target-event',time=os.time()*1000}}
+    end
+    cb({sequence=1,events=events})
+  else assert(method=='feedback');cb({ok=true}) end
+end
+spell.watch(0)
+assert(vim.wait(500,function() return spell.attempts[#spell.attempts].target=='party3' end), 'Native event target must reach the Lua action')
+spell.watcher:stop();spell.watcher:close();spell.watcher=nil
+print('PASS picker targets across native events, card defaults, explicit commands and dot repetition')
 vim.fn.delete(test_state, 'rf')
 vim.cmd.qa({ bang = true })

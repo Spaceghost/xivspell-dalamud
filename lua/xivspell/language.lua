@@ -6,7 +6,7 @@ local fields = {
   ['self.alive'] = 'boolean', ['target.alive'] = 'boolean', ['focus.alive'] = 'boolean',
   ['self.casting'] = 'boolean',
 }
-local targets = { self=true, current=true, focus=true, targetoftarget=true, role=true, tank=true, healer=true, lowest=true,
+local targets = { self=true, friendly=true, current=true, focus=true, targetoftarget=true, role=true, tank=true, healer=true, lowest=true,
   dps=true, melee=true, ranged=true, enemy=true, nearest=true, nearestmob=true, mob=true, boss=true, ally=true }
 for i = 1, 8 do targets['party' .. i] = true end
 local aliases = {
@@ -15,7 +15,7 @@ local aliases = {
   ft='focus', ['focus-target']='focus', focus_target='focus', tot='targetoftarget',
   enemies='enemy', foe='enemy', foes='enemy', opponent='enemy', nearest='nearest', ['nearest-enemy']='nearest', nearest_enemy='nearest', closest='nearest', ['nearest-mob']='nearestmob', nearest_mob='nearestmob',
   mobs='mob', trash='mob', add='mob', adds='mob',
-  friend='ally', friendly='ally', teammate='ally', teammates='ally',
+  friend='ally', friendly='friendly', teammate='ally', teammates='ally',
   lowesthp='lowest', injured='lowest', hurt='lowest', wounded='lowest',
   mt='tank1', ['main-tank']='tank1', ot='tank2', ['off-tank']='tank2',
 }

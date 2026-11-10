@@ -101,6 +101,7 @@ public sealed partial class Plugin
     }
     private void StartPlayback(bool restart = false)
     {
+        CloseWeaveTargets(false);
         SuspendRhythm();
         rhythmShown=false;keyboard.AllowRuneDelete=false;
         autoFollow.Authorize();
@@ -136,13 +137,15 @@ public sealed partial class Plugin
             if (!hudStartup.IsCompletedSuccessfully) return;
             if (hud == null) {
                 hudController = new OverlayController();
-                hud = new WeaveHud { OpenSource = id => {
+                hud = new WeaveHud { OpenTargets = ToggleWeaveTargets, OpenSource = id => {
                     if (disposed) return;
+                    CloseWeaveTargets(false);
                     InterruptWeave("Editing Lua in Neovim", true);
                     CardInput(":nvim " + id, "editor");
                 } };
                 hudController.AddNode(hud);
                 CreateRhythmHud();
+                CreateWeaveTargets();
             }
             var player = objects.LocalPlayer;
             var available = barVisible && player != null && !player.IsDead && !gameGui.GameUiHidden &&
@@ -151,14 +154,15 @@ public sealed partial class Plugin
             hud.IsVisible = available;
             keyboard.Install();
             keyboard.Enabled = available;
-            if (!available) { SuspendRhythm(); if (rhythmHud!=null) rhythmHud.IsVisible=false; ReadController(false); keyboard.PollBackspace(Environment.TickCount64, false); InterruptWeave("Spellcasting suspended"); lastPlayerPosition = null; return; }
+            if (!available) { CloseWeaveTargets(false); SuspendRhythm(); if (rhythmHud!=null) rhythmHud.IsVisible=false; ReadController(false); keyboard.PollBackspace(Environment.TickCount64, false); InterruptWeave("Spellcasting suspended"); lastPlayerPosition = null; return; }
             GetWindowThreadProcessId(GetForegroundWindow(), out var foreground);
             var focused = foreground == (uint)Environment.ProcessId;
             var otherText = editorOpen || RaptureAtkModule.Instance()->IsTextInputActive() || Dalamud.Bindings.ImGui.ImGui.GetIO().WantTextInput || visible;
             keyboard.Enabled = focused && !otherText;
             keyboard.AllowRuneDelete = config.RhythmEnabled && rhythmShown;
+            if (!focused || otherText) CloseWeaveTargets(false);
             UpdateRhythm(focused && !otherText);
-            keyboard.Capture = weave.InputMode;
+            keyboard.Capture = weave.InputMode || WeaveTargetsOpen;
             keyboard.PollBackspace(Environment.TickCount64, (GetAsyncKeyState(0x08) & 0x8000) != 0 &&
                 (GetAsyncKeyState(0x11) & 0x8000) == 0 && (GetAsyncKeyState(0x12) & 0x8000) == 0, weave.Draft.Length > 0 || (config.RhythmEnabled && rhythm.Prefix.Length > 0));
             if (!focused || otherText) {
@@ -204,13 +208,14 @@ public sealed partial class Plugin
                 // may determine resource, target, movement and recast readiness.
                 if (armed && card != null && ActionManager.Instance() != null) {
                     var request = "weave-" + Guid.NewGuid().ToString("N");
-                    weave.Begin(request); weaveSentAt = Environment.TickCount64; CardInput(next.Command, "command", requestId: request);
+                    weave.Begin(request); weaveSentAt = Environment.TickCount64; CardInput(next.Command, "command", requestId: request, target: next.TargetOverride);
                 }
             }
             // A lost result is an unknown outcome: retain the cursor and require explicit continuation.
             if (weave.InFlight != null && (Environment.TickCount64 - weaveSentAt > 35000 || Environment.TickCount64 - lastRuntimePoll >= 3000)) InterruptWeave("Spellbook disconnected");
             hud.Render(weave, cards, data, armed, Environment.TickCount64 - lastRuntimePoll < 3000, conditions[Dalamud.Game.ClientState.Conditions.ConditionFlag.InCombat], RuneTarget, ReadCooldown, composer, config.RhythmEnabled && rhythmShown);
             RenderRhythmHud();
+            RenderWeaveTargets();
         } catch (Exception ex) { log.Error(ex, "Spell weave update"); InterruptWeave("Weave paused"); }
     }
 
@@ -227,6 +232,7 @@ public sealed partial class Plugin
     private void ReadWeaveKeyboard()
     {
         while (keyboard.Events.TryDequeue(out var input)) {
+            if (WeaveTargetKeyboard(input)) continue;
             if (RhythmKeyboard(input)) continue;
             switch (input.Type) {
                 case SpellKeyboard.Kind.Escape: CardInput("cancel", "voice"); composer.Active = false; InterruptWeave("Interrupted", true); break;
@@ -295,18 +301,21 @@ public sealed partial class Plugin
         }
         // The game's hotkey table is separate from WM_CHAR. Suppress only owned keys.
         var modified = (GetAsyncKeyState(0x11) & 0x8000) != 0 || (GetAsyncKeyState(0x12) & 0x8000) != 0;
-        if (!modified) for (var key = 0; key < 256; key++) {
-            var owned = weave.InputMode && (key is >= 0x30 and <= 0x5A || key is >= 0xBA and <= 0xE2 || key is 0x20 or 0x08 or 0x09 or 0x0D) || key == 0xBE;
+        for (var key = 0; key < 256; key++) {
+            var down = (GetAsyncKeyState(key) & 0x8000) != 0;
+            var owned = targetKeys.Filter(key, down) || !modified &&
+                ((weave.InputMode || WeaveTargetsOpen) && (key is >= 0x30 and <= 0x5A || key is >= 0xBA and <= 0xE2 || key is 0x20 or 0x08 or 0x09 or 0x0D) || key == 0xBE);
             if (owned && keys.IsVirtualKeyValid(key)) keys[key] = false;
-            if (!owned && (GetAsyncKeyState(key) & 0x8000) != 0 && (key is >= 0x25 and <= 0x28 || (!weave.InputMode && key is 0x57 or 0x41 or 0x53 or 0x44))) MovementControl();
+            if (!modified && !owned && down && (key is >= 0x25 and <= 0x28 || (!weave.InputMode && key is 0x57 or 0x41 or 0x53 or 0x44))) MovementControl();
         }
-        keyboard.Capture = weave.InputMode;
+        keyboard.Capture = weave.InputMode || WeaveTargetsOpen;
     }
 
 }
 
 internal sealed class WeaveHud : OverlayNode
 {
+    public Action? OpenTargets { get; init; }
     public Action<string>? OpenSource { get; init; }
     public Vector2 SpellEntryPosition { get; private set; }
     public override bool HideWithNativeUi => false;
@@ -319,6 +328,7 @@ internal sealed class WeaveHud : OverlayNode
     private readonly TextNode leftOverflow, rightOverflow;
     private float lineWidth = 560, lineScroll;
     private readonly TextNode title;
+    private readonly TextButtonNode targetButton;
     private readonly TextNode letters;
     private readonly TextNode hint;
     private readonly TextNode rule;
@@ -367,6 +377,8 @@ internal sealed class WeaveHud : OverlayNode
         headerLeft.AttachNode(this, NodePosition.AsLastChild);
         headerRight.AttachNode(this, NodePosition.AsLastChild);
         title = Text(15, Gold, new(0, 0), new(360, 20));
+        targetButton = new TextButtonNode { String="TARGET ▾", Size=new(92,22), IsVisible=true, OnClick=()=>OpenTargets?.Invoke() };
+        targetButton.AttachNode(this,NodePosition.AsLastChild);
         rule = Text(14, Gold, new(0, 17), new(360, 20)); rule.String = "─── ◇ ─────────────────── ◇ ───";
         letters = Text(23, Ice, new(8, 45), new(340, 34));
         hint = Text(14, new(.9f, .95f, 1, 1), new(8, 80), new(350, 18));
@@ -537,7 +549,10 @@ internal sealed class WeaveHud : OverlayNode
         Alpha = opacity;
         var now = Environment.TickCount64;
         var mode = composer.Active ? "COMPOSE" : weave.InputMode ? "WEAVE" : "CONTROL";
-        title.String = rhythmMode ? "G R I M O I R E   ◇   S P E L L S T R I N G S" : $"G R I M O I R E   ◇   {mode}{(weave.Paused ? " · PAUSED" : "")}";
+        var titleText = rhythmMode ? "G R I M O I R E   ◇   S P E L L S T R I N G S" : $"G R I M O I R E   ◇   {mode}{(weave.Paused ? " · PAUSED" : "")}";
+        title.String = WeavePresentation.Clip(titleText, Math.Max(22,(int)((lineWidth-104)/7.5f)));
+        targetButton.Position=new(lineWidth-96,0);
+        targetButton.String=weave.NextTarget==null ? "TARGET ▾" : WeavePresentation.Clip(WeavePresentation.TargetLabel(weave.NextTarget),11)+" ▾";
         RenderWheel(composer, cards, data, controllerMorph, lineWidth);
         title.TextColor = weave.Paused || !live ? Gold : Ice;
         var hiddenLeft = 0; var hiddenRight = 0;

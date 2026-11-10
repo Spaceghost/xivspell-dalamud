@@ -16,6 +16,17 @@ spec.loader.exec_module(bridge)
 
 
 class BridgeTests(unittest.TestCase):
+    def test_target_tool_only_prepares_a_future_rune(self):
+        class Native:
+            def __init__(self): self.calls=[]
+            def spell(self, request):
+                self.calls.append(request)
+                return {'nextTarget':request['target']}
+        native=Native()
+        result=bridge.mcp_local('spellbook_target',{'target':'party2'},Path('.'),native)
+        self.assertEqual(result,{'nextTarget':'party2'})
+        self.assertEqual(native.calls,[{'method':'weave_target','target':'party2'}])
+
     def test_parallel_upstream_calls_share_session_and_unique_ids(self):
         barrier = threading.Barrier(4)
         requests = []

@@ -113,7 +113,8 @@ function M.cast(id, typing, finished, request_id, target_override)
   function ctx:cast(action, target)
     assert(not intent, 'One action per invocation. Use ctx:sequence() for multi-step macros.')
     assert(type(action) == 'number' and action > 0 and action == math.floor(action), 'action must be a positive action id')
-    intent = { action = action, target = target_override or target or self.target }
+    intent = { action = action, target = target_override or target or self.target,
+      targetExplicit = target_override ~= nil or target ~= nil }
   end
   function ctx:sequence(steps)
     assert(#steps > 0, 'Sequence is empty')
@@ -317,7 +318,7 @@ function M.watch(sequence)
         elseif (event.kind == 'compile' or event.kind == 'translate') and math.abs(os.time() * 1000 - (event.time or 0)) < 3000 then
           M.prepare_line(event)
         elseif event.kind == 'command' and math.abs(os.time() * 1000 - (event.time or 0)) < 3000 then
-          M.invoke(event.card, event.seconds, event.requestId)
+          M.invoke(event.card, event.seconds, event.requestId, nil, event.target)
         end
       end
       after = result.sequence or after
@@ -356,13 +357,14 @@ end
 ---Execute a spell name or expansion from the native game input bar. A dot repeats the last successful command.
 ---@param text string
 ---@param seconds? number
-function M.invoke(text, seconds, request_id, waiting_since)
+function M.invoke(text, seconds, request_id, waiting_since, target_override)
   local conditionOutcome
   local input = require('xivspell.command').normalize(text)
   if input == '.' then
     if not M.last_command then M.transport('feedback', { text = 'No previous spell to repeat', requestId = request_id }, function() end); return false end
     hooks.emit('repeat', { command = M.last_command })
     input = M.last_command
+    target_override = target_override or M.last_target_override
   end
   local function feedback(message, accepted, skipped, retry) M.transport('feedback', { text = message, requestId = request_id, accepted = accepted, mode = M.mode, condition = conditionOutcome, skipped = skipped, retry = retry }, function() end) end
   if M.busy then
@@ -370,7 +372,7 @@ function M.invoke(text, seconds, request_id, waiting_since)
     -- crossing the bridge. Let that result settle before evaluating the restart.
     if request_id and request_id:match('^weave%-') and clock() - (waiting_since or clock()) < 3 then
       waiting_since = waiting_since or clock()
-      vim.defer_fn(function() M.invoke(text, seconds, request_id, waiting_since) end, 80)
+      vim.defer_fn(function() M.invoke(text, seconds, request_id, waiting_since, target_override) end, 80)
       return true
     end
     feedback('Still waiting for the previous spell', false); return false
@@ -395,7 +397,7 @@ function M.invoke(text, seconds, request_id, waiting_since)
   if not program then M.streak = 0; feedback(error, false); return false end
   local call
   call, conditionOutcome = require('xivspell.language').select(program, M.snapshot or {})
-  if not call then M.last_command = program.line; feedback('Condition false · skipped', true, true); return true end
+  if not call then M.last_command = program.line; M.last_target_override = target_override; feedback('Condition false · skipped', true, true); return true end
   local card = call.card
   local typing = { input = text, seconds = seconds or 0, repeatCommand = text == '.',
     wpm = seconds and seconds > 0 and math.floor(#text / 5 / seconds * 60) or 0 }
@@ -404,9 +406,10 @@ function M.invoke(text, seconds, request_id, waiting_since)
       M.streak = 0; feedback(failure or result.message or 'Spell unavailable', false, false, result and result.retry)
     else
       M.streak = (M.streak or 0) + 1; M.last_command = program.line
+      M.last_target_override = target_override
       feedback(card.name .. ' · ' .. M.streak .. ' chain' .. (M.mode == 'practice' and ' · practice' or ' · requested'), true)
     end
-  end, request_id, call.target)
+  end, request_id, call.target or target_override)
   if not issued then feedback('Spell cancelled or Lua card failed', false) end
   return issued
 end
@@ -441,6 +444,9 @@ function M.setup(opts)
     M.transport('input', { text = o.args, requestId = tostring(vim.uv.hrtime()) }, function(_, error) if error then notify(error) end end)
   end, { nargs = 1, complete = complete })
   api.nvim_create_user_command('SpellEdit', function(o) M.edit(o.args) end, { nargs = 1, complete = complete })
+  api.nvim_create_user_command('SpellTarget', function(o)
+    M.transport('weave_target', {target=o.args}, function(result, failure) notify(failure or result.message) end)
+  end, {nargs=1, complete=function() return {'card','friendly','self','current','focus','tank','lowest','targetOfTarget','enemy','nearest','mob','boss','party1','party2','party3','party4','party5','party6','party7','party8'} end})
   api.nvim_create_user_command('SpellSync', M.sync, {})
   api.nvim_create_user_command('SpellStats', M.stats, {})
   api.nvim_create_user_command('SpellFollow', function(o)

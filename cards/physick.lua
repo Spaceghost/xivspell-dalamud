@@ -2,7 +2,8 @@
 return {
   name = "Physick",
   action = actions.physick,
-  target = "self",
+  -- Heal the selected living teammate/player; otherwise heal yourself.
+  target = "friendly",
   phrase = "physick",
   ---@param ctx SpellContext
   run = function(ctx)

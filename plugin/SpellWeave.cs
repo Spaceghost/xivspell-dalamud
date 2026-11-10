@@ -10,15 +10,17 @@ public sealed class SpellWeave
         public ulong TargetId { get; init; }
         public uint PlayedAction { get; init; }
         public bool? ConditionResult { get; init; }
+        public string? TargetOverride { get; init; }
     }
-    public sealed record SavedState(Rune[] Runes, string Draft, int Cursor, bool InputMode);
-    public SavedState SaveState() => new(Runes.ToArray(), Draft, Cursor, InputMode);
+    public sealed record SavedState(Rune[] Runes, string Draft, int Cursor, bool InputMode, string? NextTarget = null);
+    public SavedState SaveState() => new(Runes.ToArray(), Draft, Cursor, InputMode, NextTarget);
     public void Restore(SavedState? state)
     {
         if (state == null) return;
         Runes.Clear(); Runes.AddRange((state.Runes ?? []).Take(Capacity));
         Draft = (state.Draft ?? "")[..Math.Min(state.Draft?.Length ?? 0, 255)];
         Cursor = Math.Clamp(state.Cursor, 0, Runes.Count); InputMode = state.InputMode;
+        NextTarget = state.NextTarget;
         InFlight = LastRequest = null; Paused = !Finished; DraftRevision++;
         Hint = Paused ? "Weave restored · > continue  /  . restart" : "Type a spell to weave it";
     }
@@ -27,6 +29,8 @@ public sealed class SpellWeave
     public bool InputMode { get; private set; } = true;
     public bool Paused { get; private set; }
     public int Cursor { get; private set; }
+    public string? NextTarget { get; private set; }
+    public void SelectNextTarget(string? selector) { NextTarget = selector; }
     public string? InFlight { get; private set; }
     public string? LastRequest { get; private set; }
     public long DraftRevision { get; private set; }
@@ -52,7 +56,8 @@ public sealed class SpellWeave
     {
         if (Finished && InFlight == null && !Paused && Runes.Count > 0 && Environment.TickCount64 - Runes[^1].Created > 4000) { previous.Clear(); previous.AddRange(Runes); Runes.Clear(); Cursor = 0; }
         if (Runes.Count >= Capacity) { Hint = "Weave full · finish or interrupt first"; return false; }
-        Runes.Add(new(command, cardId, Environment.TickCount64)); Draft = "";
+        Runes.Add(new(command, cardId, Environment.TickCount64) { TargetOverride = NextTarget });
+        NextTarget = null; Draft = "";
         DraftRevision++;
         Hint = Paused ? "Spell woven · > continues" : "Spell woven";
         return true;
@@ -75,7 +80,7 @@ public sealed class SpellWeave
         DraftRevision++;
         var cancelled = InFlight;
         InFlight = LastRequest = null;
-        Runes.Clear(); previous.Clear(); Draft = ""; Cursor = 0; Paused = false;
+        Runes.Clear(); previous.Clear(); Draft = ""; NextTarget = null; Cursor = 0; Paused = false;
         Hint = "Line cleared · type a spell";
         return cancelled;
     }

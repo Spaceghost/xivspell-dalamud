@@ -1,5 +1,5 @@
 ---@meta
----@alias SpellTarget 'current'|'self'|'focus'|'targetOfTarget'|'tank'|'healer'|'lowest'|'role'|'party1'|'party2'|'party3'|'party4'|'party5'|'party6'|'party7'|'party8'|string
+---@alias SpellTarget 'current'|'friendly'|'self'|'focus'|'targetOfTarget'|'tank'|'healer'|'lowest'|'role'|'party1'|'party2'|'party3'|'party4'|'party5'|'party6'|'party7'|'party8'|string
 ---@class SpellContext
 ---@field state table<string, any> Persistent per-card state; advances after an accepted request or practice cast.
 ---@field target SpellTarget Default target of this card.
@@ -57,6 +57,7 @@ function Context:sequence(steps) end
 ---@field action integer
 ---@field target SpellTarget
 ---@field requestId? string
+---@field targetExplicit? boolean Explicit picker, on TARGET syntax or ctx:cast target; allows planned aims within the selected encounter.
 ---@class SpellBeforeCast
 ---@field card SpellCard
 ---@field intent SpellIntent Mutable action request, before dispatch.

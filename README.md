@@ -76,6 +76,37 @@ Casting remains a separate explicit command; musical input cannot cast a spell
 or move the character. Focus loss, cutscenes and other text input pause the round.
 The existing queue and casting/control mode are preserved across plugin reloads.
 
+## Aiming spells
+
+Physick heals the living friendly player or teammate you have selected, falling
+back to yourself when an enemy or no friendly is selected.
+
+Click **TARGET** in Grimoire's header (or `/xivspell targets`) to aim the next
+completed spell. The picker works during ordinary and rhythm spelling. Choose a
+named party slot, **FOCUS**, **TANK**, **LOWEST HP**, **NEAREST ENEMY**, **TRASH / ADD**,
+or **BOSS**, then spell normally. With the picker open, keys **1–8** choose party
+slots. The choice stays on that queued rune; the next word uses its own default.
+Choosing a target never casts. The picker pauses an unfinished rhythm word and
+resumes it with a fresh approach after your choice.
+
+For a mixed queue, choose your teammate's party button and spell Physick, then
+choose an enemy aim and spell Ruin. Press `>` when ready. These party/focus
+heals do not change your selected enemy. **FOCUS SELECTED** pins your current
+teammate as focus; **SELECT ENEMY** selects the closest living hostile without
+casting. **MARK BOSS** marks your selected enemy so **BOSS** and **TRASH / ADD**
+can address the boss and other enemies separately. Explicitly aimed attacks may
+hit adds while retaining the selected encounter; losing that encounter still
+requires explicit continuation.
+
+Ordinary weaving also accepts `on party2 physick`, `on focus physick`,
+`on lowest physick`, `on targetOfTarget physick`, `on nearest ruin`, and
+`on boss ruin`, followed by Enter. In rhythm mode, use TARGET and keep typing
+spell words. Explicit `on TARGET` text takes priority over a picker choice.
+Neovim's `:SpellTarget party2` and MCP's `spellbook_target` prepare the same
+one-spell aim. Party/focus/nearest selectors resolve when the rune casts; use a
+party or focus choice for a mixed queue instead of relying on the current
+selection remaining unchanged.
+
 ## Development
 
 Changes integrate directly on `master` after checks. CI runs offline tests and

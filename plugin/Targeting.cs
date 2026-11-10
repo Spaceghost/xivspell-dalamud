@@ -2,6 +2,7 @@ using System.Numerics;
 using System.Text.RegularExpressions;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
+using Dalamud.Game.ClientState.Objects.SubKinds;
 
 namespace XivSpell;
 
@@ -9,6 +10,13 @@ public sealed partial class Plugin
 {
     private ulong bossTarget;
     private uint bossTerritory;
+    private IGameObject? ResolveFriendly()
+    {
+        var selected = targets.Target;
+        if (selected is ICharacter { IsDead: false, IsTargetable: true } &&
+            (selected is IPlayerCharacter || party.Any(p => p.GameObject?.GameObjectId == selected.GameObjectId))) return selected;
+        return objects.LocalPlayer;
+    }
     private static bool IsEnemy(IGameObject? actor) => actor is IBattleNpc npc &&
         npc.BattleNpcKind == BattleNpcSubKind.Combatant && (npc.StatusFlags & StatusFlags.Hostile) != 0 && npc.IsTargetable && !npc.IsDead;
 
@@ -47,7 +55,7 @@ public sealed partial class Plugin
         if (rune.Command.StartsWith("if ", StringComparison.OrdinalIgnoreCase)) return new(0, "IF", "conditional");
         var match = ExplicitTarget.Match(rune.Command);
         string selector = match.Success ? match.Groups["name"].Success ? "name:" + match.Groups["name"].Value : match.Groups["selector"].Value
-            : cards.FirstOrDefault(c => c.Id == rune.CardId)?.Target ?? "current";
+            : rune.TargetOverride ?? cards.FirstOrDefault(c => c.Id == rune.CardId)?.Target ?? "current";
         try {
             var actor = Resolve(selector);
             return new(actor?.GameObjectId ?? 0, selector, actor?.Name.TextValue ?? (selector == "boss" ? "mark :boss" : "unavailable"));
