@@ -37,6 +37,15 @@ assert(vim.wait(20000, function()
 end, 200), 'MCP completion missing: ' .. vim.inspect(tools))
 local count = vim.tbl_count(tools)
 assert(count >= 170, 'Expected full API completion, got ' .. count)
+vim.api.nvim_buf_set_lines(0, 2, 3, false, { '  ctx:cast(163, "")' })
+local targetLabels
+assert(vim.wait(20000, function()
+  targetLabels = {}
+  for label in pairs(complete(2, 17)) do targetLabels[label:gsub("[\"']", '')] = true end
+  return targetLabels.friendly and targetLabels.party2 and targetLabels.focus and
+    targetLabels.enemy and targetLabels.nearest and targetLabels.mob and targetLabels.boss
+end, 200), 'Spell target completion missing: ' .. vim.inspect(targetLabels))
+print('PASS: party, friendly, focus and enemy target argument completion')
 vim.api.nvim_buf_set_lines(0, 0, -1, false, { '---@type SpellUserConfig', 'local config = {', '  hooks = {',
   '    before_cast = function(event)', '      event.', '    end,', '  },', '}' })
 local hook
