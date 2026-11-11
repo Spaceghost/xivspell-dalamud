@@ -14,6 +14,7 @@ public sealed partial class Plugin
 {
     private NativeWeaveTargets? weaveTargets;
     private bool resumeRhythmAfterTargets;
+    private bool inputAfterTargetSelection;
     private long targetChoicesAt;
     private WeaveTargetChoice[] targetChoices = [];
     private readonly KeyboardLease targetKeys = new();
@@ -27,7 +28,12 @@ public sealed partial class Plugin
         if (!WeaveSelectors.Contains(selector)) throw new InvalidOperationException("Choose card, friendly, self, current, focus, a party slot/role or an enemy selector");
         weave.SelectNextTarget(selector == "card" ? null : selector);
         weave.Hint = selector == "card" ? "Next spell uses its card target" : "Next spell → " + WeavePresentation.TargetLabel(selector) + " · " + TargetDescription(selector);
+        var enterInput = inputAfterTargetSelection;
         CloseWeaveTargets(true);
+        if (enterInput) {
+            if (!RhythmKeyboard(new(SpellKeyboard.Kind.Input))) { weave.EnterInput(); autoFollow.Authorize(); }
+            keyboard.Capture = weave.InputMode;
+        }
     }
     private string TargetDescription(string selector)
     {
@@ -74,12 +80,12 @@ public sealed partial class Plugin
             rhythm.Resume(times?[0] ?? rhythmClock.NextBeat(RhythmNow + 1.2), times);
             weave.EnterInput();
         }
-        resumeRhythmAfterTargets = false; keyboard.Capture = weave.InputMode;
+        resumeRhythmAfterTargets = inputAfterTargetSelection = false; keyboard.Capture = weave.InputMode;
     }
     private bool WeaveTargetKeyboard(SpellKeyboard.Input input)
     {
         if (input.Type == SpellKeyboard.Kind.Targets) {
-            targetKeys.Hold('T'); ToggleWeaveTargets(); return true;
+            targetKeys.Hold('T'); ToggleWeaveTargets(); inputAfterTargetSelection = WeaveTargetsOpen; return true;
         }
         if (!WeaveTargetsOpen) return false;
         if (input.Type is SpellKeyboard.Kind.Escape or SpellKeyboard.Kind.Movement ||
@@ -185,7 +191,7 @@ internal sealed class NativeWeaveTargets : OverlayNode
         title.Position=new(10,6);title.Size=new(width-20,24);
         title.String="NEXT SPELL TARGET · "+(selected==null ? "DEFAULT" : WeavePresentation.TargetLabel(selected));
         detail.Position=new(10,31);detail.Size=new(width-20,22);
-        detail.String=WeavePresentation.Clip(hovered>=0 && hovered<items.Length ? items[hovered].Detail : "1–8 party · T tank · Ctrl+T close · Applies to the next spell",(int)((width-20)/6));
+        detail.String=WeavePresentation.Clip(hovered>=0 && hovered<items.Length ? items[hovered].Detail : "1–8 party · T tank · Esc close · Applies to the next spell",(int)((width-20)/6));
         var cell=(width-38)/4;
         for(var i=0;i<choices.Length;i++) {
             choices[i].Position=new(10+(i%4)*(cell+6),58+(i/4)*28);choices[i].Size=new(cell,24);

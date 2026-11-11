@@ -1,3 +1,8 @@
+0.1.0.10
+- T opens targeting in CONTROL mode; T again chooses a living party tank and 1–8 choose party slots.
+- Return directly to spelling after a keyboard target choice; keep T as a normal letter while spelling.
+- Replace Ctrl+T with the plain T shortcut; Escape closes targeting and stops.
+
 0.1.0.9
 - Ctrl+T opens/closes the target picker; T selects a living party tank and 1–8 select party slots.
 - R2+X / Cross repeats the weave and R2+O / Circle continues it, including in rhythm mode with the wheel closed.

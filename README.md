@@ -89,11 +89,14 @@ The existing queue and casting/control mode are preserved across plugin reloads.
 Physick heals the living friendly player or teammate you have selected, falling
 back to yourself when an enemy or no friendly is selected.
 
-Press **Ctrl+T**, click **TARGET**, or use `/xivspell targets` to aim the next
-completed spell. The picker works during ordinary and rhythm spelling. Choose a
+Press **T** in CONTROL mode (**Esc** leaves spelling), click **TARGET**, or use
+`/xivspell targets` to aim the next completed spell. The picker works during
+ordinary and rhythm spelling. Choose a
 named party slot, **FOCUS**, **TANK**, **LOWEST HP**, **NEAREST ENEMY**, **TRASH / ADD**,
 or **BOSS**, then spell normally. With the picker open, keys **1–8** choose party
-slots; **T** chooses a living party tank. **Ctrl+T** closes the picker too.
+slots; **T** chooses a living party tank. **Esc** closes the picker and stops.
+The keyboard shortcut returns you to spelling after selection: **T → T → physick**
+aims Physick at a tank. While spelling, T remains an ordinary letter.
 The choice stays on that queued rune; the next word uses its own default.
 Choosing a target never casts. The picker pauses an unfinished rhythm word and
 resumes it with a fresh approach after your choice.
