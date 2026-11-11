@@ -117,13 +117,13 @@ In ordinary weaving, on party2 physick / on focus physick / on lowest physick /
 on targetOfTarget physick / on nearest ruin + Enter provide the text forms.
 In rhythm mode, type those same phrases on the pulses, including the spaces.
 
-Steam Controller radial spelling: F8 (bind a back grip), L3+R3, or
-/xivspell radial opens the wheels. Map left/right trackpads in the streaming
-client's Steam Input layout to left/right joystick outputs, and right-pad press
-to R3. Left pad selects a letter group; right pad selects a character. L2 or
-right-pad press confirms on the beat. LB enters space, X resets/undoes, Y commits
-an exact shorter name, B closes. R2+A repeats; R2+B continues. Release pads and
-buttons after opening to activate the wheels. See doc/steam-controller.txt.
+Steam Controller radial spelling uses Moonbeam's radial trackpad keyboard.
+Left pad selects a letter group; right pad selects a character and lifting it
+types on the beat. Center right is Space; center left selects editing keys.
+Buttons, sticks, triggers and gyro keep their normal gamepad controls.
+R2+A repeats; R2+B continues. L3+R3 is passed through normally.
+F8 and /xivspell radial still explicitly open the older modal stick wheel.
+See doc/steam-controller.txt for the required client build and validation status.
 
 ctx:cast(actionId, target?) emits one action request. ctx.state is persistent
 for this card during the runtime session. It commits only after a successful
@@ -431,8 +431,8 @@ Hold R2 and tap X / Cross to repeat the line (.), or O / Circle to continue
 mode, including with the wheel closed. Each press fires once. Release the
 face button before pressing again; a held chord never repeats automatically.
 
-Press L3+R3 (both stick clicks), or /xivspell pad, to morph into the controller
-spell wheel. Release the opening chord before navigating.
+Use /xivspell pad to open the controller spell wheel with rhythm off.
+Release held controls before navigating. L3+R3 keeps its normal game behavior.
 
   D-pad left/right     choose spell
   D-pad up/down        choose target

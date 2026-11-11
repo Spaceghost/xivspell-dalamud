@@ -14,13 +14,12 @@ internal sealed unsafe class GrimoirePad : IDisposable
     private readonly GrimoirePadLease lease = new();
     private readonly PadPlaybackShortcuts playback = new();
     private readonly Hook<PadDevice.Delegates.Update> hook;
-    private bool disposed, enabled, composerEnabled, chordHeld;
+    private bool disposed, enabled;
     private double enabledUntil, playbackAt;
     private PadPlaybackCommand pendingPlayback;
-    private int opened, activeCallbacks;
+    private int activeCallbacks;
     private int activeDevice = int.MinValue;
     private static double Now => Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-    internal bool TakeOpen() => Interlocked.Exchange(ref opened, 0) != 0;
     internal PadPlaybackCommand TakePlayback()
     {
         lock (gate) {
@@ -36,14 +35,12 @@ internal sealed unsafe class GrimoirePad : IDisposable
         hook = interop.HookFromAddress<PadDevice.Delegates.Update>((nint)PadDevice.StaticVirtualTablePointer->Update, Poll);
         hook.Enable();
     }
-    internal GrimoirePadFrame? Read(bool available, bool focus, bool allowComposer)
+    internal GrimoirePadFrame? Read(bool available, bool focus)
     {
         lock (gate) {
             enabled = available;
-            composerEnabled = available && allowComposer;
             enabledUntil = Now + GrimoirePadLease.MaximumLeaseSeconds;
             if (!available) { pendingPlayback = PadPlaybackCommand.None; playback.Suspend(); }
-            if (!composerEnabled) Interlocked.Exchange(ref opened, 0);
             if (!available || !focus) { lease.Release("XivHud.Grimoire", 1, Now); return null; }
             lease.Renew("XivHud.Grimoire", 1, Now);
             return lease.Read("XivHud.Grimoire", 1, Now);
@@ -57,11 +54,11 @@ internal sealed unsafe class GrimoirePad : IDisposable
             original(pad);
             lock (gate) {
                 if (disposed || pad == null || !pad->Settings.PadAvailable) {
-                    lease.Invalidate(); playback.Reset(); pendingPlayback = PadPlaybackCommand.None; chordHeld = false; activeDevice = int.MinValue; return;
+                    lease.Invalidate(); playback.Reset(); pendingPlayback = PadPlaybackCommand.None; activeDevice = int.MinValue; return;
                 }
                 if (activeDevice != pad->ActiveGamepadDeviceIndex) {
                     activeDevice = pad->ActiveGamepadDeviceIndex;
-                    lease.Invalidate(); playback.Reset(); pendingPlayback = PadPlaybackCommand.None; chordHeld = false;
+                    lease.Invalidate(); playback.Reset(); pendingPlayback = PadPlaybackCommand.None;
                 }
                 var raw = pad->GamepadInputData;
                 var eligible = enabled && Now <= enabledUntil;
@@ -78,16 +75,11 @@ internal sealed unsafe class GrimoirePad : IDisposable
                     lease.Release("XivHud.Grimoire", 1, Now);
                     var drain = lease.Poll(sample, true, Now);
                     if (drain.Buttons != 0) Filter(ref pad->GamepadInputData, drain.Buttons);
-                    pendingPlayback = PadPlaybackCommand.None; chordHeld = false; return;
+                    pendingPlayback = PadPlaybackCommand.None; return;
                 }
                 if (shortcut.Command != PadPlaybackCommand.None) {
                     pendingPlayback = shortcut.Command; playbackAt = Now;
-                    Interlocked.Exchange(ref opened, 0);
                 }
-                var chord = (raw.Buttons & (GamepadButtonsFlags.L3 | GamepadButtonsFlags.R3)) == (GamepadButtonsFlags.L3 | GamepadButtonsFlags.R3);
-                if (composerEnabled && shortcutMask == 0 && chord && !chordHeld) Interlocked.Exchange(ref opened, 1);
-                chordHeld = chord;
-                if (composerEnabled && chord) Filter(ref pad->GamepadInputData, (uint)(GamepadButtonsFlags.L3 | GamepadButtonsFlags.R3));
                 var filter = lease.Poll(sample, true, Now);
                 if (filter.All) {
                     ref var input = ref pad->GamepadInputData;

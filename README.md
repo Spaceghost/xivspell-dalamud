@@ -65,21 +65,19 @@ last queued spell; hold it to clear the queue. Visible **UNDO SPELL** and
 Escape pauses, `i` resumes weaving, `>` casts and returns movement control,
 and `.` repeats. Completion alone never casts.
 
-Steam Controller trackpads can spell through two native radial wheels. Open them
-with **F8** (bind a back grip to it), **L3+R3**, or `/xivspell radial`. The left pad
-chooses a letter group; the right pad chooses a character. Tap **L2** or press the
-right pad on the beat to enter it. **LB** enters a space, **X** resets the phrase
-or undoes a spell, **Y** commits an exact shorter name, and **B** closes the wheels.
-Lift both thumbs and release buttons when opening; movement returns on close.
-Keyboard spelling continues to work while the wheels are open.
+For the 2026 Steam Controller, Moonbeam's **radial trackpad keyboard** sends
+individual keyboard taps alongside normal PlayStation-style gamepad input.
+The left pad selects a group; aim and lift the right thumb to type on the beat.
+Center right is Space; center left selects editing and playback keys. Sticks,
+face buttons, triggers and gyro keep their normal controls while spelling.
+L3+R3 no longer opens a modal wheel or takes over movement.
 
-On the streaming client, use Steam Input to map the left and right trackpads to
-the corresponding joystick outputs, and the right-pad press to **R3**. Map a back
-grip to **F8**. These mappings carry through an ordinary streamed gamepad; the
-plugin does not require raw Steam Controller USB access on the host.
-See [Steam Controller setup](doc/steam-controller.txt) for the full mapping and
-checks. The original spell-card controller composer remains available with
-rhythm off through `/xivspell pad`.
+This requires the Moonbeam client build with native Steam Controller trackpad
+support. Do not map the pads onto joystick axes in Steam Input. See
+[Steam Controller setup](doc/steam-controller.txt) for installation and testing
+status. The older modal stick wheel is still explicitly available through F8 or
+`/xivspell radial`; it captures the pad until closed. The spell-card composer
+remains available with rhythm off through `/xivspell pad`.
 
 For playback in either mode, hold **R2** and tap **X / Cross** to repeat (`.`),
 or **O / Circle** to continue (`>`). The controller wheel does not need to be

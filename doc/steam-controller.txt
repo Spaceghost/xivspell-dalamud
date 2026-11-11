@@ -1,65 +1,53 @@
 STEAM CONTROLLER / STREAMED SPELLSTRINGS
 
-This layout uses the latest Steam Controller on the streaming client. The
-trackpads send normal gamepad axes to the host, where XivSpell draws the wheels.
-Configure the streaming app's Steam Input layout, rather than the host launcher.
+The 2026 Steam Controller connects to the streaming client. Moonbeam translates
+its two trackpads into individual keyboard taps; it forwards buttons, sticks,
+triggers and gyro through the normal PlayStation-style controller path.
+XivSpell receives ordinary keyboard input and does not need raw USB access.
 
 CLIENT SETUP
 
-For a desktop streaming app supported by Steam Input, add that app to the
-client's Steam library and launch it through Steam. Start from a normal Gamepad
-layout and make these changes:
+Use the Moonbeam build containing the radial trackpad keyboard and Triton
+driver. Enable Settings > Gamepad > Use Steam Controller trackpads as a radial
+keyboard (enabled by default). Connect by USB or the wireless dongle.
 
-  Left trackpad       Joystick; output Left Joystick
-  Right trackpad      Joystick; output Right Joystick
-  Right-pad press     Right Stick Click (R3)
-  Left-pad press      Unassigned
-  Back grip (L4)      Keyboard F8
-  Optional back grip  Keyboard Backspace
-  Face buttons        Normal A/B/X/Y gamepad buttons
-  Triggers/bumpers    Normal LT/RT/LB/RB gamepad controls
+Launch Moonbeam directly, or disable Steam Input for its Steam shortcut so
+Moonbeam can see both native trackpads. Remove the older pad-to-stick mappings.
+Do not open XivSpell's F8 modal wheel for this layout.
 
-Use positional joystick output, with a fixed center, linear response and no
-trackball momentum. Keep normal stick mappings. Outside the spelling wheels,
-the pads can also serve as movement and camera controls. No Steam action-layer
-toggle is needed, so closing the in-game wheel cannot leave a layer out of sync.
+  Left pad outer ring   Select ABCD, EFGH, IJKL, MNOP, QRST, UVWX, YZ-' or 0-9
+  Left pad center       Select tools: period, greater-than, Backspace, Enter, Esc
+  Right pad outer ring  Aim at a character; lift to type it on the rhythm pulse
+  Right pad center      Tap and lift for a space
+  Sticks / face buttons / triggers / gyro  Normal gamepad behavior
+  R2 + A                Repeat the weave (PlayStation R2 + Cross)
+  R2 + B                Continue the weave (PlayStation R2 + Circle)
 
-Valve documents joystick output for trackpads here:
-https://partner.steamgames.com/doc/features/steam_controller/input_source_modes
+Touching the pads displays the guide in Moonbeam; lifting both hides it.
+The selected letter group stays selected until changed. A held thumb never
+repeats letters. Focus loss or disconnect cancels the unfinished gesture.
+Type i to enter weaving, then spell the full target and spell name on the beat.
 
-SPELLING
-
-Press the mapped grip/F8, both stick clicks (L3+R3), or use /xivspell radial.
-For rhythm spelling specifically, /xivspell rhythm pad enables rhythm and opens
-the wheels. Lift both thumbs and release buttons once after opening.
-
-  Left pad            Pick ABCD, EFGH, IJKL, MNOP, QRST, UVWX, YZ/space/- or digits
-  Right pad           Point at a character in the selected group
-  L2 / right-pad press Enter that character on the rhythm pulse
-  LB                  Enter a space on the pulse
-  X                   Restart the unfinished phrase; otherwise undo the last spell
-  Y                   Finish an exact shorter spell name
-  B / grip / F8       Close and return to movement
-  R2 + A              Repeat the weave (PlayStation R2 + Cross)
-  R2 + B              Continue the weave (PlayStation R2 + Circle)
-
-Hovering never types. Holding a confirmation does not repeat. R2 by itself does
-not enter a letter, so preparing a playback chord cannot add an accidental rune.
-The letter and rhythm timestamp are captured together at button-down.
-
-Spell "tank physick" including its space. Then spell "physick"; it keeps the
+Spell "tank physick", including its space. Then spell "physick"; it keeps the
 tank target. "self physick" changes the target for that and following spells.
 DEFAULT in the target picker or clearing the weave resets target memory. Undoing
 a spell that changed the target restores the preceding aim.
 
-CHECK THE ROUTE
+OLDER MODAL WHEEL
 
-Open the wheels, release the controller, and slide each pad. The left selection
-and right character highlight should follow the pads. If the cursor moves
-instead, change that pad from Mouse to Joystick in the client's Steam Input
-layout. If the wheels stay at "Lift both thumbs", release both pads, sticks,
-triggers and face buttons; confirm that the streaming app receives a gamepad.
+F8 or /xivspell radial still opens XivSpell's older stick-operated wheel. It
+temporarily captures the controller and is separate from Moonbeam's keyboard.
+L3+R3 no longer opens it automatically. The card composer is /xivspell pad.
 
-The game-side wheels and input policy can be tested independently. The physical
-Steam Controller mapping still needs confirmation on the streaming client;
-generic controller or keyboard tests do not establish that the pads are routed.
+VALIDATION AND PORTABILITY
+
+The keyboard channel is independent of the host OS. Moonbeam has desktop
+clients for Linux, Windows and macOS; its native mobile Android/iOS clients
+are not implemented by this change. A portable touch-to-key state machine
+does not by itself establish mobile controller access or ship a mobile app.
+
+Software tests cover the radial gestures and XivSpell target memory. The
+physical Steam Controller is on a separate streaming device, so end-to-end
+USB/dongle routing still needs a client test. Move and rotate the camera while
+typing a phrase; each lift should enter one letter without affecting either
+stick. Alt-tab while holding a pad, then return and lift: it must not type.

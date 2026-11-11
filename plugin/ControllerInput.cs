@@ -13,13 +13,10 @@ public sealed partial class Plugin
         eligible &= !gamepad.EnableGamepadNav;
         var composerEligible = eligible && !config.RhythmEnabled;
         if (!composerEligible) composer.Active = false;
-        var frame = pad.Read(eligible, radial.Active || composerEligible && composer.Active, eligible);
+        var frame = pad.Read(eligible, radial.Active || composerEligible && composer.Active);
         if (!eligible) { composer.Active = false; radial.Close(); return; }
         var playback = pad.TakePlayback();
         if (playback != PadPlaybackCommand.None) { StartPlayback(playback == PadPlaybackCommand.Repeat); return; }
-        if (pad.TakeOpen()) {
-            ToggleRadial(); padSequence = 0;
-        }
         if (radial.Active) { ReadRadial(frame); return; }
         if (!composerEligible) return;
         if ((!composer.Active && !RhythmPadOwned) || frame is not { Phase: "Active" } f || f.Sequence == 0) { padSequence = 0; return; }
