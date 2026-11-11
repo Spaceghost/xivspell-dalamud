@@ -10,6 +10,10 @@ setup and recovery. [The playtest handoff](doc/PLAYTEST.txt) records existing
 evidence and the remaining player checks. Automatic following, healer behavior,
 controller casting and duty completion are not established by offline tests.
 
+While Grimoire is visible and live casting is enabled, it hides the game's own
+player cast bar. Hiding Grimoire, using `/xivspell off`, or unloading the plugin
+restores that bar. Enemy cast bars and your saved HUD layout are preserved.
+
 ## Build and check
 
 Requires Python 3, Neovim 0.11 or newer, and .NET SDK 10.0.401. The plugin uses

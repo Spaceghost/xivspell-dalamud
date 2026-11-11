@@ -7,6 +7,8 @@ using System.Text.Json;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Configuration;
 using Dalamud.Game.Command;
+using Dalamud.Game.Addon.Lifecycle;
+using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Plugin;
@@ -57,6 +59,7 @@ public sealed partial class Plugin : IDalamudPlugin
     private readonly IGamepadState gamepad;
     private readonly IKeyState keys;
     private readonly IClientState client;
+    private readonly IAddonLifecycle addonLifecycle;
     private readonly NativeChatSuppression nativeChat = new();
     private readonly Config config;
     private readonly TcpListener listener = new(IPAddress.Loopback, 41806);
@@ -77,13 +80,14 @@ public sealed partial class Plugin : IDalamudPlugin
 
     public Plugin(IDalamudPluginInterface pi, ICommandManager commands, IFramework framework,
         IObjectTable objects, ITargetManager targets, IPartyList party, ICondition conditions,
-        IDataManager data, ITextureProvider textures, IPluginLog log, IGamepadState gamepad, IKeyState keys, IGameGui gameGui, IClientState client, IGameInteropProvider interop)
+        IDataManager data, ITextureProvider textures, IPluginLog log, IGamepadState gamepad, IKeyState keys, IGameGui gameGui, IClientState client, IGameInteropProvider interop, IAddonLifecycle addonLifecycle)
     {
         this.pi = pi; this.commands = commands; this.framework = framework; this.objects = objects;
         this.targets = targets; this.party = party; this.conditions = conditions; this.data = data;
         this.textures = textures; this.log = log;
         this.gamepad = gamepad; this.keys = keys; this.gameGui = gameGui;
         this.client = client;
+        this.addonLifecycle = addonLifecycle;
         actionEffects = new ActionEffects(interop);
         try { pad = new GrimoirePad(interop); } catch (Exception ex) { log.Warning(ex, "Grimoire controller capture unavailable"); }
         config = pi.GetPluginConfig() as Config ?? new Config();
@@ -122,6 +126,7 @@ public sealed partial class Plugin : IDalamudPlugin
         framework.Update += FollowUpdate;
         framework.Update += WeaveUpdate;
         framework.Update += InputUpdate;
+        addonLifecycle.RegisterListener(AddonEvent.PreDraw, "_CastBar", SuppressNativeCastBar);
         var gate = pi.GetIpcProvider<string, string>("XivSpell.Call");
         gate.RegisterFunc(input => Serialize(Dispatch(JsonSerializer.Deserialize<Request>(input, Json) ?? new())));
         ipc = new Cleanup(gate.UnregisterFunc);
@@ -130,6 +135,12 @@ public sealed partial class Plugin : IDalamudPlugin
     }
 
     private void Open() { barVisible = true; focusSpellInput = true; }
+    private void SuppressNativeCastBar(AddonEvent _, AddonArgs args)
+    {
+        // Skip only the player's native cast-bar draw. Its updates and saved
+        // HUD settings stay intact, so hiding/disarming Grimoire restores it.
+        if (!disposed && armed && hud?.IsVisible == true) args.PreventOriginal();
+    }
     private static string Serialize(object value) => JsonSerializer.Serialize(value, Json);
     public sealed class Request
     {
@@ -457,6 +468,7 @@ public sealed partial class Plugin : IDalamudPlugin
         // Unloading can be initiated outside the game thread. Never wait for
         // that thread here: it can itself be waiting for plugin unloading.
         disposed = true;
+        addonLifecycle.UnregisterListener(AddonEvent.PreDraw, "_CastBar", SuppressNativeCastBar);
         armed = false;
         keyboard.Enabled = false;
         keyboard.CaptureCombatEnter = false;

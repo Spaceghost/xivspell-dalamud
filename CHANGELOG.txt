@@ -1,3 +1,7 @@
+0.1.0.8
+- Hide the player's native cast bar while Grimoire is visible and casting is enabled.
+- Restore native drawing when Grimoire is hidden, disarmed or unloaded; preserve saved HUD settings and enemy cast bars.
+
 0.1.0.7
 - Treat JSON-null target overrides as absent so queued spells use their card defaults.
 - Preserve macro targets, explicit picker choices and repeat targets across native events.
