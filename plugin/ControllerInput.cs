@@ -10,10 +10,16 @@ public sealed partial class Plugin
     private void ReadController(bool eligible)
     {
         if (pad == null) return;
-        eligible &= !gamepad.EnableGamepadNav && !config.RhythmEnabled;
-        // Free spelling is keyboard-only. Release all existing pad leases here.
-        var frame = pad.Read(eligible, composer.Active || RhythmPadOwned);
+        eligible &= !gamepad.EnableGamepadNav;
+        var composerEligible = eligible && !config.RhythmEnabled;
+        if (!composerEligible) composer.Active = false;
+        // Rhythm spelling never leases the pad, but the two playback chords
+        // work in either mode without capturing movement or other hotbar keys.
+        var frame = pad.Read(eligible, composerEligible && composer.Active, composerEligible);
         if (!eligible) { composer.Active = false; return; }
+        var playback = pad.TakePlayback();
+        if (playback != PadPlaybackCommand.None) { StartPlayback(playback == PadPlaybackCommand.Repeat); return; }
+        if (!composerEligible) return;
         if (pad.TakeOpen()) {
             composer.Active = !composer.Active; padSequence = 0;
             if (composer.Active) { InterruptWeave("Controller composing", true); barVisible = true; }

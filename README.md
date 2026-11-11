@@ -62,6 +62,10 @@ Rhythm input is keyboard-only for now and takes no controller lease. A future
 radial spelling selector, with hover or trigger confirmation, is deferred.
 Normal non-rhythm controller composition remains available with rhythm off.
 
+For playback in either mode, hold **R2** and tap **X / Cross** to repeat (`.`),
+or **O / Circle** to continue (`>`). The controller wheel does not need to be
+open. Each face-button press runs once; holding it does not repeat the command.
+
 Piano's optional `XivPiano.RhythmTimeline.v1` feed supplies up to 30 seconds of
 future song onsets from a separate background decode of its downloaded song.
 The chart uses those future timings when enough pulses are available; an
@@ -85,11 +89,12 @@ The existing queue and casting/control mode are preserved across plugin reloads.
 Physick heals the living friendly player or teammate you have selected, falling
 back to yourself when an enemy or no friendly is selected.
 
-Click **TARGET** in Grimoire's header (or `/xivspell targets`) to aim the next
+Press **Ctrl+T**, click **TARGET**, or use `/xivspell targets` to aim the next
 completed spell. The picker works during ordinary and rhythm spelling. Choose a
 named party slot, **FOCUS**, **TANK**, **LOWEST HP**, **NEAREST ENEMY**, **TRASH / ADD**,
 or **BOSS**, then spell normally. With the picker open, keys **1–8** choose party
-slots. The choice stays on that queued rune; the next word uses its own default.
+slots; **T** chooses a living party tank. **Ctrl+T** closes the picker too.
+The choice stays on that queued rune; the next word uses its own default.
 Choosing a target never casts. The picker pauses an unfinished rhythm word and
 resumes it with a fresh approach after your choice.
 

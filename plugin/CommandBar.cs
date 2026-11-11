@@ -658,7 +658,7 @@ internal sealed class WeaveHud : OverlayNode
         editorMore.Position = new(8, footer + 44);
         editorCommands.String = ":nvim SPELL source · :e SPELL tile · :w save · :q close";
         editorMore.String = ":ls book · :reload · :clear · :boss / :unboss · :help";
-        controls.String = composer.Active ? "L3+R3 close · Start continue · Select restart" : weave.Paused ? "> continue here   ·   . repeat weave   ·   i construct" : "i construct   ·   Esc stop   ·   . repeat   ·   > continue";
+        controls.String = composer.Active ? "R2+X repeat · R2+O continue · L3+R3 close" : weave.Paused ? "> continue here   ·   . repeat weave   ·   i construct" : "i construct   ·   Esc stop   ·   . repeat   ·   > continue";
         // Native text and icons float directly over the scene. Reserve space
         // only for visible content rather than a permanent instruction panel.
         letters.IsVisible = !rhythmMode;

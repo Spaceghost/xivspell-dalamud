@@ -8,7 +8,7 @@ namespace XivSpell;
 // Native character translation preserves spaces, punctuation and keyboard layouts.
 internal sealed class SpellKeyboard : IDisposable
 {
-    internal enum Kind { Character, Escape, Input, Backspace, TextBackspace, ClearLine, Complete, Commit, Movement }
+    internal enum Kind { Character, Escape, Input, Backspace, TextBackspace, ClearLine, Complete, Commit, Movement, Targets }
     internal readonly record struct Input(Kind Type, char Character = '\0')
     {
         internal long At { get; init; } = Environment.TickCount64;
@@ -49,6 +49,13 @@ internal sealed class SpellKeyboard : IDisposable
     {
         try {
             if (message == 0x101 && value == 0x08) { lock (backspaceGate) backspace.Release(); }
+            if (Enabled && (GetKeyState(0x11) & 0x8000) != 0 && (GetKeyState(0x12) & 0x8000) == 0 && (GetKeyState(0x10) & 0x8000) == 0) {
+                if (message == 0x100 && value == 0x54) {
+                    if (((long)param & (1L << 30)) == 0) Events.Enqueue(new(Kind.Targets));
+                    return 0;
+                }
+                if (message == 0x102 && value == 0x14) return 0; // Ctrl+T's control character
+            }
             // Intercept before the native chat sees WM_KEYDOWN. Framework key
             // filtering alone cannot retain a tap shorter than one frame.
             if (message == 0x100 && value == 0x0D && CaptureCombatEnter &&

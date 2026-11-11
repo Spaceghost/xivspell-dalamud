@@ -1,3 +1,8 @@
+0.1.0.9
+- Ctrl+T opens/closes the target picker; T selects a living party tank and 1–8 select party slots.
+- R2+X / Cross repeats the weave and R2+O / Circle continues it, including in rhythm mode with the wheel closed.
+- Trigger playback once per face-button press, suppress native face-button actions through release, and require neutral input after focus changes.
+
 0.1.0.8
 - Hide the player's native cast bar while Grimoire is visible and casting is enabled.
 - Restore native drawing when Grimoire is hidden, disarmed or unloaded; preserve saved HUD settings and enemy cast bars.

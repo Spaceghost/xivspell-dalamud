@@ -96,10 +96,11 @@ Each cards/*.lua buffer returns a SpellCard. A minimum example:
 Targets: current, friendly, self, focus, targetOfTarget, party1..party8. Casting on a
 focus or party member does not change your selected enemy target.
 Physick defaults to friendly: the selected living player/party ally, otherwise
-self. For deliberate mixed queues, use the native TARGET button to choose a
+self. For deliberate mixed queues, press Ctrl+T or use the native TARGET button to choose a
 party slot, focus, tank or lowest-HP ally for the next completed spell only.
 The same picker offers enemy, nearest, trash and marked-boss aims. It pauses
-an unfinished rhythm word while open. Keys 1–8 select party slots; Escape
+an unfinished rhythm word while open. Keys 1–8 select party slots, T chooses
+a living party tank, and Ctrl+T closes the picker. Escape
 retains its usual stop behavior. The choice stays on its rune through repeat
 and reload. Later target choices do not rewrite earlier queued spells.
 FOCUS SELECTED pins a teammate, SELECT ENEMY acquires the closest hostile,
@@ -408,6 +409,11 @@ casts for this run: x4, x3, x2, x1. Once spent it dims and restores the original
 count for the next run; . restarts the whole saved line.
 
 CONTROLLER WEAVING
+
+Hold R2 and tap X / Cross to repeat the line (.), or O / Circle to continue
+(>). These shortcuts work while Grimoire is visible in ordinary and rhythm
+mode, including with the wheel closed. Each press fires once. Release the
+face button before pressing again; a held chord never repeats automatically.
 
 Press L3+R3 (both stick clicks), or /xivspell pad, to morph into the controller
 spell wheel. Release the opening chord before navigating.
