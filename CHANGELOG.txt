@@ -1,3 +1,8 @@
+0.1.0.7
+- Treat JSON-null target overrides as absent so queued spells use their card defaults.
+- Preserve macro targets, explicit picker choices and repeat targets across native events.
+- Reject null target selectors at the plugin boundary with a useful error instead of a null reference.
+
 0.1.0.6
 - Physick heals your selected living friendly player/teammate, with self fallback.
 - Native TARGET popover adds named party slots, focus, tank, lowest HP and enemy aims.

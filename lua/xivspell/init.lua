@@ -103,7 +103,15 @@ local function find(id)
   for _, card in ipairs(M.cards) do if card.id == id then return card end end
 end
 
+local function optional_target(target)
+  -- Native events serialize an absent picker override as JSON null. Neovim
+  -- decodes that as truthy vim.NIL, which must not override a card's target.
+  if target == vim.NIL then return nil end
+  return target
+end
+
 function M.cast(id, typing, finished, request_id, target_override)
+  target_override = optional_target(target_override)
   local card = find(id)
   if not card then notify('Unknown card: ' .. tostring(id), vim.log.levels.ERROR); return false end
   if M.busy then notify('Waiting for the previous input result'); return false end
@@ -358,6 +366,7 @@ end
 ---@param text string
 ---@param seconds? number
 function M.invoke(text, seconds, request_id, waiting_since, target_override)
+  target_override = optional_target(target_override)
   local conditionOutcome
   local input = require('xivspell.command').normalize(text)
   if input == '.' then

@@ -152,7 +152,8 @@ public sealed partial class Plugin : IDalamudPlugin
         public long Revision { get; set; }
     }
 
-    private IGameObject? Resolve(string target) => target switch {
+    private IGameObject? Resolve(string? target) => target switch {
+        null => throw new InvalidOperationException("Target selector is required"),
         "current" => targets.Target,
         "self" => objects.LocalPlayer,
         "focus" => targets.FocusTarget,
