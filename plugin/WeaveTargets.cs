@@ -14,7 +14,6 @@ public sealed partial class Plugin
 {
     private NativeWeaveTargets? weaveTargets;
     private bool resumeRhythmAfterTargets;
-    private bool inputAfterTargetSelection;
     private long targetChoicesAt;
     private WeaveTargetChoice[] targetChoices = [];
     private readonly KeyboardLease targetKeys = new();
@@ -28,12 +27,7 @@ public sealed partial class Plugin
         if (!WeaveSelectors.Contains(selector)) throw new InvalidOperationException("Choose card, friendly, self, current, focus, a party slot/role or an enemy selector");
         weave.SelectNextTarget(selector == "card" ? null : selector);
         weave.Hint = selector == "card" ? "Next spell uses its card target" : "Next spell → " + WeavePresentation.TargetLabel(selector) + " · " + TargetDescription(selector);
-        var enterInput = inputAfterTargetSelection;
         CloseWeaveTargets(true);
-        if (enterInput) {
-            if (!RhythmKeyboard(new(SpellKeyboard.Kind.Input))) { weave.EnterInput(); autoFollow.Authorize(); }
-            keyboard.Capture = weave.InputMode;
-        }
     }
     private string TargetDescription(string selector)
     {
@@ -80,13 +74,10 @@ public sealed partial class Plugin
             rhythm.Resume(times?[0] ?? rhythmClock.NextBeat(RhythmNow + 1.2), times);
             weave.EnterInput();
         }
-        resumeRhythmAfterTargets = inputAfterTargetSelection = false; keyboard.Capture = weave.InputMode;
+        resumeRhythmAfterTargets = false; keyboard.Capture = weave.InputMode;
     }
     private bool WeaveTargetKeyboard(SpellKeyboard.Input input)
     {
-        if (input.Type == SpellKeyboard.Kind.Targets) {
-            targetKeys.Hold('T'); ToggleWeaveTargets(); inputAfterTargetSelection = WeaveTargetsOpen; return true;
-        }
         if (!WeaveTargetsOpen) return false;
         if (input.Type is SpellKeyboard.Kind.Escape or SpellKeyboard.Kind.Movement ||
             input.Type == SpellKeyboard.Kind.Character && input.Character is '.' or '>') {

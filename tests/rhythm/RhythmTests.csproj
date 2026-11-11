@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../plugin/Rhythm.cs" Link="Rhythm.cs" />
+    <Compile Include="../../plugin/RhythmTargetPhrases.cs" Link="RhythmTargetPhrases.cs" />
     <Compile Include="../../plugin/SpellWeave.cs" Link="SpellWeave.cs" />
   </ItemGroup>
 </Project>

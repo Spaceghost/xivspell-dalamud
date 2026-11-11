@@ -39,7 +39,7 @@ internal sealed class NativeRhythmHud : OverlayNode
         feedback=Text(12,Cyan);deletion=Text(11,Gold);controls=Text(11,White);
         toggle=Button("WEAVE",()=>Toggle?.Invoke(),60);
         undo=Button("UNDO SPELL",()=>Delete?.Invoke(),98);
-        reset=Button("RESET WORD",()=>Reset?.Invoke(),98);
+        reset=Button("RESET SPELL",()=>Reset?.Invoke(),98);
         cast=Button("CAST + MOVE",()=>Cast?.Invoke(),112);
         source=Button("PIANO",()=>Source?.Invoke(),60);tap=Button("TAP",()=>Tap?.Invoke(),42);
     }
@@ -102,11 +102,11 @@ internal sealed class NativeRhythmHud : OverlayNode
         word.FontSize=round.Prefix.Length>23 ? 18u : 25u;
         Label(word,136,21,textWidth,round.Prefix.Length>0 ? round.Prefix.ToUpperInvariant()+"│" : "◇  weave any spell");
         word.TextColor=round.Prefix.Length>0 ? White : new(.72f,.83f,.86f,1);
-        var candidates=round.Prefix.Length>0 ? string.Join(" / ",round.Matches.Select(s=>s.Name).Distinct().Take(3)) : "Type while the pulse is inside the shaded band.";
+        var candidates=round.Prefix.Length>0 ? string.Join(" / ",round.Matches.Select(s=>s.Name).Distinct().Take(3)) : "tank physick · party2 physick · or any spell";
         Label(matches,136,57,textWidth,WeavePresentation.Clip(candidates,(int)(textWidth/6)));
         Label(feedback,136,80,textWidth,WeavePresentation.Clip(recent ? round.Feedback : "Center of the band = perfect timing",(int)(textWidth/6)));
         feedback.TextColor=recent && fail ? Red : Cyan;
-        Label(deletion,8,114,width-16,round.Prefix.Length>0 ? "BACKSPACE  restart word · press again to undo spell · HOLD to clear queue" : "BACKSPACE  undo spell · HOLD to clear queue · ENTER queues an exact name");
+        Label(deletion,8,114,width-16,round.Prefix.Length>0 ? "BACKSPACE  restart whole spell · press again to undo spell · HOLD to clear queue" : "BACKSPACE  undo spell · HOLD to clear queue · ENTER queues an exact name");
         toggle.Position=new(8,140);undo.Position=new(72,140);reset.Position=new(174,140);
         cast.Position=new(276,140);source.Position=new(392,140);tap.Position=new(456,140);
         toggle.String=round.Active ? "PAUSE" : round.State==RhythmRound.Phase.Paused ? "RESUME" : "WEAVE";

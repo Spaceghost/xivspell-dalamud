@@ -52,9 +52,16 @@ next spell. If a name is also the beginning of a longer spell, keep typing the
 longer name or press **Enter** to queue the exact shorter name. Spaces inside
 multiword names are timed characters too.
 
+Targets are part of the rhythm phrase: type **`tank physick`**, **`party2 physick`**,
+**`focus physick`** or **`self physick`**, including the space on a pulse. The entire
+phrase queues one spell with that target attached. **`on tank physick`** also works.
+Target prefixes work with spell ids and shortcuts too, such as `self sc`.
+A mistake or Backspace resets the whole phrase, including the target. Nothing
+is selected or queued from the target word alone.
+
 **Backspace** restarts an unfinished word. With an empty word it removes the
 last queued spell; hold it to clear the queue. Visible **UNDO SPELL** and
-**RESET WORD** buttons make those actions available without remembering keys.
+**RESET SPELL** buttons make those actions available without remembering keys.
 Escape pauses, `i` resumes weaving, `>` casts and returns movement control,
 and `.` repeats. Completion alone never casts.
 
@@ -89,14 +96,18 @@ The existing queue and casting/control mode are preserved across plugin reloads.
 Physick heals the living friendly player or teammate you have selected, falling
 back to yourself when an enemy or no friendly is selected.
 
-Press **T** in CONTROL mode (**Esc** leaves spelling), click **TARGET**, or use
-`/xivspell targets` to aim the next completed spell. The picker works during
-ordinary and rhythm spelling. Choose a
+In rhythm mode, type the target first as part of the spell: **`tank physick`**
+heals a party tank; **`party2 physick`** heals party slot 2. You stay in rhythm
+spelling throughout. The target stays attached to that rune through repeat and
+reload; the next plain `physick` uses its normal friendly/self default. Targets
+include `tank1`, `tank2`, `healer`, `party1`–`party8`, `focus`, `self`, `lowest`,
+`enemy`, `nearest`, `mob`, `boss` and the other spell-language selectors.
+
+The optional **TARGET** button or `/xivspell targets` also aims the next
+completed spell. The picker works during ordinary and rhythm spelling. Choose a
 named party slot, **FOCUS**, **TANK**, **LOWEST HP**, **NEAREST ENEMY**, **TRASH / ADD**,
 or **BOSS**, then spell normally. With the picker open, keys **1–8** choose party
 slots; **T** chooses a living party tank. **Esc** closes the picker and stops.
-The keyboard shortcut returns you to spelling after selection: **T → T → physick**
-aims Physick at a tank. While spelling, T remains an ordinary letter.
 The choice stays on that queued rune; the next word uses its own default.
 Choosing a target never casts. The picker pauses an unfinished rhythm word and
 resumes it with a fresh approach after your choice.
@@ -112,8 +123,8 @@ requires explicit continuation.
 
 Ordinary weaving also accepts `on party2 physick`, `on focus physick`,
 `on lowest physick`, `on targetOfTarget physick`, `on nearest ruin`, and
-`on boss ruin`, followed by Enter. In rhythm mode, use TARGET and keep typing
-spell words. Explicit `on TARGET` text takes priority over a picker choice.
+`on boss ruin`, followed by Enter. In rhythm mode, type the same phrases on the
+pulses. A target typed into the spell takes priority over a picker choice.
 Neovim's `:SpellTarget party2` and MCP's `spellbook_target` prepare the same
 one-spell aim. Party/focus/nearest selectors resolve when the rune casts; use a
 party or focus choice for a mixed queue instead of relying on the current

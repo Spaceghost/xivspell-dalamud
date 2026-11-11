@@ -1,3 +1,9 @@
+0.1.0.11
+- Rhythm-type target and spell as one phrase: tank physick, party2 physick, focus physick or on tank physick.
+- Time every letter and space; mistakes and Backspace reset the whole phrase, including its target.
+- Store the explicit target in the completed spell command so queueing, reload and repeat preserve its aim.
+- Show target-aware rhythm matches and remove the plain T picker shortcut.
+
 0.1.0.10
 - T opens targeting in CONTROL mode; T again chooses a living party tank and 1–8 choose party slots.
 - Return directly to spelling after a keyboard target choice; keep T as a normal letter while spelling.

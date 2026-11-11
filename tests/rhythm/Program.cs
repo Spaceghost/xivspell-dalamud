@@ -71,6 +71,69 @@ Check(r.Completed && r.Target?.Command=="summon carbuncle","A card id is a rhyth
 r.TakeCompleted(35.5);r.Press('s',36);r.Press('u',36.5);
 Check(r.Matches.Count(m=>m.Phrase=="summon ruby")==1 && r.Matches.First(m=>m.Phrase=="summon ruby").Name=="Summon Ruby","Duplicate words keep the first (full phrase) entry");
 
+var targetDeck = RhythmTargetPhrases.Expand(deck.Concat(summons).Concat(branching));
+RhythmRound TypeTargetPhrase(string phrase)
+{
+    var round = new RhythmRound();
+    Check(round.Start(targetDeck, 10, .5), "Targeted rhythm deck starts");
+    for (var i = 0; i < phrase.Length; i++) {
+        Check(round.Press(phrase[i], 10 + i * .5) == RhythmRound.Grade.Perfect, "Target, space and spell all use the beat: " + phrase);
+        if (i < phrase.Length - 1) Check(!round.Completed, "A partial target phrase cannot queue a rune: " + phrase);
+    }
+    return round;
+}
+var tankPhrase = TypeTargetPhrase("tank physick");
+Check(tankPhrase.Completed && tankPhrase.Target?.Command == "on tank physick" && tankPhrase.Target.Id == "physick",
+    "The whole target and spell produce one explicitly aimed command");
+Check(tankPhrase.Hits == 12 && tankPhrase.Score == 1200 && tankPhrase.Target!.Name.Contains("TANK"),
+    "The target and separator count toward the rhythm score and appear in the completion label");
+var aimedWeave = new SpellWeave(); aimedWeave.SelectNextTarget("party3");
+var tankSpell = tankPhrase.TakeCompleted(15.5)!;
+Check(aimedWeave.Add(tankSpell.Command!, tankSpell.Id), "Completed target phrase fits in the queue");
+aimedWeave.Interrupt("Queued");
+Check(aimedWeave.Runes.Count == 1 && aimedWeave.Next == null && aimedWeave.InFlight == null && aimedWeave.NextTarget == null,
+    "Targeted rhythm completion queues exactly one rune without casting or leaving a pending target");
+aimedWeave.Add("physick", "physick");
+Check(aimedWeave.Runes[1].Command == "physick" && aimedWeave.Runes[1].TargetOverride == null,
+    "The next untargeted spell keeps its own default");
+var restoredAim = new SpellWeave(); restoredAim.Restore(aimedWeave.SaveState()); restoredAim.Repeat();
+Check(restoredAim.Runes[0].Command == "on tank physick" && restoredAim.Next?.CardId == "physick",
+    "The target remains part of the spell through reload and repeat");
+foreach (var (phrase, command) in new[] { ("party2 physick", "on party2 physick"), ("on focus physick", "on focus physick"),
+    ("self sc", "on self summon carbuncle"), ("ot physick", "on tank2 physick"), ("tot physick", "on targetOfTarget physick") }) {
+    var round = TypeTargetPhrase(phrase);
+    Check(round.Completed && round.Target?.Command == command, "Targeting preserves aliases, ids and canonical spell commands: " + phrase);
+}
+var shortTarget = TypeTargetPhrase("enemy ruin");
+Check(!shortTarget.Completed && shortTarget.NextLetters.Contains("SPACE"), "Targeted spells preserve longer-name disambiguation");
+Check(shortTarget.Commit(15) && shortTarget.Target?.Command == "on enemy ruin", "Enter commits an exact targeted shorter spell");
+var longTarget = TypeTargetPhrase("enemy ruin ii");
+Check(longTarget.Completed && longTarget.Target?.Command == "on enemy ruin ii", "The longer targeted spell requires every timed character");
+var brokenTarget = TypeTargetPhrase("tank phy");
+Check(brokenTarget.Press('x', 14) == RhythmRound.Grade.Wrong && brokenTarget.Prefix == "" && brokenTarget.Target == null,
+    "A wrong spell letter clears the target too");
+foreach (var (ch, i) in "physick".Select((ch, i) => (ch, i))) brokenTarget.Press(ch, 14.5 + i * .5);
+Check(brokenTarget.Completed && brokenTarget.Target?.Command == null && brokenTarget.Target?.Phrase == "physick",
+    "A failed target phrase cannot aim a later plain spell");
+var missedSpace = TypeTargetPhrase("tank");
+Check(!missedSpace.Commit(11.6), "Typing just a target cannot queue or select anything");
+Check(missedSpace.Press(' ', 11.7) == RhythmRound.Grade.Early && missedSpace.Prefix == "", "The separator has the same timing requirement as letters");
+var missedTarget = TypeTargetPhrase("tank phy"); missedTarget.Tick(14.3);
+Check(missedTarget.LastGrade == RhythmRound.Grade.Miss && missedTarget.Prefix == "" && missedTarget.Target == null,
+    "A missed pulse resets the entire targeted spell");
+var pausedTarget = TypeTargetPhrase("tank "); pausedTarget.Pause(12.1); pausedTarget.Resume(30);
+foreach (var (ch, i) in "physick".Select((ch, i) => (ch, i))) pausedTarget.Press(ch, 30 + i * .5);
+Check(pausedTarget.Completed && pausedTarget.Target?.Command == "on tank physick", "Pause preserves the target within the unfinished phrase");
+var erasedTarget = TypeTargetPhrase("party2 phy"); erasedTarget.Restart(15);
+Check(erasedTarget.Prefix == "" && erasedTarget.Target == null && erasedTarget.Misses == 0, "Backspace resets the target and spell together");
+var collision = RhythmTargetPhrases.Expand([new("custom", "tank physick", "Custom"), new("physick", "physick", "Physick")]);
+Check(collision.Single(s => s.Phrase == "tank physick").Id == "custom", "Generated target phrases cannot shadow a full spell name");
+var maximumName = new string('x', 64);
+var longDeck = RhythmTargetPhrases.Expand([new("long", maximumName, "Long")]);
+var longRound = new RhythmRound(); longRound.Start(longDeck, 1, .5);
+Check(longRound.Matches.Any(s => s.Phrase == "on targetoftarget " + maximumName), "Every existing maximum-length spell can still receive a target prefix");
+Console.WriteLine("PASS rhythm target phrases, timed spaces, whole-phrase resets, aliases, ambiguity and repeat/reload persistence");
+
 var weave=new SpellWeave();
 weave.Add("ruin","ruin");weave.Interrupt("Queued");
 Check(weave.Next==null && weave.InFlight==null,"Completing rhythm spelling never casts");

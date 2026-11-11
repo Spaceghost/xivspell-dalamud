@@ -8,7 +8,7 @@ namespace XivSpell;
 // Native character translation preserves spaces, punctuation and keyboard layouts.
 internal sealed class SpellKeyboard : IDisposable
 {
-    internal enum Kind { Character, Escape, Input, Backspace, TextBackspace, ClearLine, Complete, Commit, Movement, Targets }
+    internal enum Kind { Character, Escape, Input, Backspace, TextBackspace, ClearLine, Complete, Commit, Movement }
     internal readonly record struct Input(Kind Type, char Character = '\0')
     {
         internal long At { get; init; } = Environment.TickCount64;
@@ -72,14 +72,11 @@ internal sealed class SpellKeyboard : IDisposable
                         if (key == 0x08 && fresh) { lock (backspaceGate) backspace.Press(Environment.TickCount64); }
                         if (fresh) Events.Enqueue(new(key == 0x08 ? Kind.Backspace : key == 0x09 ? Kind.Complete : Kind.Commit));
                         return 0;
-                    } else if ((Capture && (key is >= 0x30 and <= 0x5A || key is >= 0xBA and <= 0xE2 || key is 0x20 or 0x0D)) || (!Capture && key is 0x49 or 0x54 or 0xBE)) return 0;
+                    } else if ((Capture && (key is >= 0x30 and <= 0x5A || key is >= 0xBA and <= 0xE2 || key is 0x20 or 0x0D)) || (!Capture && key is 0x49 or 0xBE)) return 0;
                 } else if (message == 0x102) { // WM_CHAR, produced by the game's TranslateMessage
                     var ch = (char)value;
                     if (((long)param & (1L << 30)) != 0) return 0;
                     if (ch is '.' or '>') { Events.Enqueue(new(Kind.Character, ch)); return 0; }
-                    // Capture immediately so a quick second T selects the tank,
-                    // even when both taps arrive before the next game frame.
-                    if (!Capture && ch is 't' or 'T') { Capture = true; Events.Enqueue(new(Kind.Targets)); return 0; }
                     if (!Capture && ch == ':') { Capture = true; Events.Enqueue(new(Kind.Input)); Events.Enqueue(new(Kind.Character, ch)); return 0; }
                     if (!Capture && ch is 'i' or 'I') { Capture = true; Events.Enqueue(new(Kind.Input)); return 0; }
                     if (AllowRuneDelete && ch == '\b') return 0;

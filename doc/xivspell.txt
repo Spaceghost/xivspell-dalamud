@@ -96,20 +96,24 @@ Each cards/*.lua buffer returns a SpellCard. A minimum example:
 Targets: current, friendly, self, focus, targetOfTarget, party1..party8. Casting on a
 focus or party member does not change your selected enemy target.
 Physick defaults to friendly: the selected living player/party ally, otherwise
-self. For deliberate mixed queues, press T in CONTROL mode (Esc leaves spelling)
-or use the native TARGET button to choose a party slot, focus, tank or lowest-HP
-ally for the next completed spell only.
+self. In rhythm mode, type the target and spell together: tank physick,
+party2 physick, focus physick or self physick. Every letter and the space is
+timed. The complete phrase queues one spell with its target; a mistake or
+Backspace resets the whole phrase, including the target. on tank physick also
+works, as do spell shortcuts such as self sc. The next plain spell uses its
+normal target. Targets remain part of the spell through repeat and reload.
+The optional native TARGET button chooses a party slot, focus, tank or
+lowest-HP ally for the next completed spell only.
 The same picker offers enemy, nearest, trash and marked-boss aims. It pauses
 an unfinished rhythm word while open. Keys 1–8 select party slots, T chooses
-a living party tank, and Escape closes the picker and stops. A choice opened
-with T returns to spelling: T, T, then physick aims at a tank. During spelling,
-T remains an ordinary letter. The choice stays on its rune through repeat
+a living party tank, and Escape closes the picker and stops. During spelling,
+T is an ordinary letter. The choice stays on its rune through repeat
 and reload. Later target choices do not rewrite earlier queued spells.
 FOCUS SELECTED pins a teammate, SELECT ENEMY acquires the closest hostile,
 and MARK BOSS distinguishes boss/add aims. These buttons never cast.
 In ordinary weaving, on party2 physick / on focus physick / on lowest physick /
 on targetOfTarget physick / on nearest ruin + Enter provide the text forms.
-In rhythm mode, use TARGET and spell the word normally.
+In rhythm mode, type those same phrases on the pulses, including the spaces.
 
 ctx:cast(actionId, target?) emits one action request. ctx.state is persistent
 for this card during the runtime session. It commits only after a successful

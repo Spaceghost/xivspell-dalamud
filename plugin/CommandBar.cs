@@ -304,7 +304,7 @@ public sealed partial class Plugin
         for (var key = 0; key < 256; key++) {
             var down = (GetAsyncKeyState(key) & 0x8000) != 0;
             var owned = targetKeys.Filter(key, down) || !modified &&
-                ((weave.InputMode || WeaveTargetsOpen) && (key is >= 0x30 and <= 0x5A || key is >= 0xBA and <= 0xE2 || key is 0x20 or 0x08 or 0x09 or 0x0D) || key is 0x54 or 0xBE);
+                ((weave.InputMode || WeaveTargetsOpen) && (key is >= 0x30 and <= 0x5A || key is >= 0xBA and <= 0xE2 || key is 0x20 or 0x08 or 0x09 or 0x0D) || key == 0xBE);
             if (owned && keys.IsVirtualKeyValid(key)) keys[key] = false;
             if (!modified && !owned && down && (key is >= 0x25 and <= 0x28 || (!weave.InputMode && key is 0x57 or 0x41 or 0x53 or 0x44))) MovementControl();
         }
@@ -658,7 +658,7 @@ internal sealed class WeaveHud : OverlayNode
         editorMore.Position = new(8, footer + 44);
         editorCommands.String = ":nvim SPELL source · :e SPELL tile · :w save · :q close";
         editorMore.String = ":ls book · :reload · :clear · :boss / :unboss · :help";
-        controls.String = composer.Active ? "R2+X repeat · R2+O continue · L3+R3 close" : !weave.InputMode ? "T targets · i construct · . repeat · > continue" : weave.Paused ? "> continue here   ·   . repeat weave   ·   Esc control" : "Esc control   ·   . repeat   ·   > continue";
+        controls.String = composer.Active ? "R2+X repeat · R2+O continue · L3+R3 close" : !weave.InputMode ? "i weave · . repeat · > continue" : weave.Paused ? "> continue here   ·   . repeat weave   ·   Esc control" : "Esc control   ·   . repeat   ·   > continue";
         // Native text and icons float directly over the scene. Reserve space
         // only for visible content rather than a permanent instruction panel.
         letters.IsVisible = !rhythmMode;

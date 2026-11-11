@@ -42,6 +42,12 @@ command('burst', vim.NIL, 'self', true) -- The card itself chooses this step's t
 command('physick', 'party3', 'party3', true)
 command('.', vim.NIL, 'party3', true) -- A null event must preserve repeat's saved aim.
 command('on focus physick', 'party3', 'focus', true)
+-- Commands emitted by rhythm target phrases use the same explicit language.
+command('on tank physick', vim.NIL, 'tank', true)
+command('.', vim.NIL, 'tank', true)
+command('on party2 physick', 'focus', 'party2', true)
+command('on self summon carbuncle', vim.NIL, 'self', true)
+command('physick', vim.NIL, 'friendly', false)
 command('ruin', nil, 'current', false)
 
 local cast

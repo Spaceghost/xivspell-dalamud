@@ -83,7 +83,7 @@ public sealed partial class Plugin
         foreach (var card in usable) { Add(card.Id, card); foreach (var alias in card.Aliases ?? []) Add(alias, card); }
         foreach (var shortcut in expansions.Keys.Order(StringComparer.Ordinal))
             if (ResolveRune(shortcut) is { } rune && usable.FirstOrDefault(c => c.Id == rune.CardId) is { } card) Add(shortcut, card);
-        return words.ToArray();
+        return RhythmTargetPhrases.Expand(words);
     }
     private void BeginRhythm()
     {
@@ -252,7 +252,7 @@ public sealed partial class Plugin
         }
         if (input.Type==SpellKeyboard.Kind.Commit) { rhythm.Commit(at);QueueRhythmSpell();return true; }
         if (input.Type==SpellKeyboard.Kind.Complete) {
-            rhythm.Notice("Type a spell, its id or a shortcut like SC · Enter queues an exact shorter name",RhythmNow);return true;
+            rhythm.Notice("Type tank physick, party2 physick or any spell · Enter queues an exact shorter name",RhythmNow);return true;
         }
         return false;
     }

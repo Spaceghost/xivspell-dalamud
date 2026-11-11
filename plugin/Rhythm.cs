@@ -62,6 +62,7 @@ public sealed class RhythmClock
 // Empty beats are optional; only an unfinished word can be broken by a miss.
 public sealed class RhythmRound
 {
+    public const int MaxPhraseLength = 96; // A 64-character spell plus its target prefix.
     // Phrase is the word typed on the beats; Command is the card's canonical
     // phrase queued when a shortcut (id, alias or expansion) completes.
     public sealed record Spell(string Id, string Phrase, string Name, string? Command = null);
@@ -96,12 +97,12 @@ public sealed class RhythmRound
     {
         if (!double.IsFinite(firstBeat) || !double.IsFinite(beatPeriod) || beatPeriod is < .12 or > 1.5) return false;
         deck = spells.Where(s => !string.IsNullOrWhiteSpace(s.Id) && !string.IsNullOrWhiteSpace(s.Phrase)
-            && s.Phrase.Length <= 64 && !s.Phrase.Any(char.IsControl))
+            && s.Phrase.Length <= MaxPhraseLength && !s.Phrase.Any(char.IsControl))
             .Select(s => s with { Phrase = s.Phrase.ToLowerInvariant() }).DistinctBy(s => s.Phrase).ToArray();
         if (deck.Length == 0) return false;
         period = beatPeriod; Prefix = LastSpell = ""; Target = null;
         Score = Combo = Hits = Misses = 0; lastInput = LastFeedback = double.NegativeInfinity;
-        LastGrade = Grade.None; Feedback = "Type any spell on the pulses";
+        LastGrade = Grade.None; Feedback = "Type a spell or target + spell on the pulses";
         SetTimeline(firstBeat, times); State = Phase.Playing; return true;
     }
     private static bool ValidTimes(IReadOnlyList<double>? times) => times is { Count: >= 2 }
@@ -127,7 +128,7 @@ public sealed class RhythmRound
         if (penalty) Misses++;
         LastGrade = grade; LastFeedback = at; Feedback = message;
     }
-    public void Restart(double at) => ResetWord(Grade.None, at, "Word cleared · start any spell", false);
+    public void Restart(double at) => ResetWord(Grade.None, at, "Phrase cleared · start any spell", false);
     public void Notice(string message, double at) { Feedback = message; LastFeedback = at; LastGrade = Grade.None; }
     public void Tick(double now)
     {
