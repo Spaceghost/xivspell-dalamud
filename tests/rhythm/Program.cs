@@ -91,11 +91,11 @@ var aimedWeave = new SpellWeave(); aimedWeave.SelectNextTarget("party3");
 var tankSpell = tankPhrase.TakeCompleted(15.5)!;
 Check(aimedWeave.Add(tankSpell.Command!, tankSpell.Id), "Completed target phrase fits in the queue");
 aimedWeave.Interrupt("Queued");
-Check(aimedWeave.Runes.Count == 1 && aimedWeave.Next == null && aimedWeave.InFlight == null && aimedWeave.NextTarget == null,
-    "Targeted rhythm completion queues exactly one rune without casting or leaving a pending target");
+Check(aimedWeave.Runes.Count == 1 && aimedWeave.Next == null && aimedWeave.InFlight == null && aimedWeave.NextTarget == "tank",
+    "Targeted rhythm completion queues exactly one rune and remembers its target without casting");
 aimedWeave.Add("physick", "physick");
-Check(aimedWeave.Runes[1].Command == "physick" && aimedWeave.Runes[1].TargetOverride == null,
-    "The next untargeted spell keeps its own default");
+Check(aimedWeave.Runes[1].Command == "physick" && aimedWeave.Runes[1].TargetOverride == "tank",
+    "The next untargeted spell reuses the previous target");
 var restoredAim = new SpellWeave(); restoredAim.Restore(aimedWeave.SaveState()); restoredAim.Repeat();
 Check(restoredAim.Runes[0].Command == "on tank physick" && restoredAim.Next?.CardId == "physick",
     "The target remains part of the spell through reload and repeat");
@@ -158,3 +158,4 @@ foreach(var offset in new[]{-.21,-.179,-.1,0,.1,.179,.21}) {
  Check(depicted==accepted,"Shaded safe zone and key grading agree before and after the ideal time");
 }
 Console.WriteLine("PASS free spelling, whole-word resets, pause, future music, reverse pulse and accurate full-window safe-zone depiction");
+RadialTests.Run();

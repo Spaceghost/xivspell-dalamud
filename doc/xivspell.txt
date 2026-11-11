@@ -100,10 +100,12 @@ self. In rhythm mode, type the target and spell together: tank physick,
 party2 physick, focus physick or self physick. Every letter and the space is
 timed. The complete phrase queues one spell with its target; a mistake or
 Backspace resets the whole phrase, including the target. on tank physick also
-works, as do spell shortcuts such as self sc. The next plain spell uses its
-normal target. Targets remain part of the spell through repeat and reload.
+works, as do spell shortcuts such as self sc. The next plain spell reuses the
+previous target: tank physick, then physick, aims both at the tank. A new target
+changes subsequent spells. DEFAULT in the picker or clearing the weave resets
+target memory. Targets remain part of the spell through repeat and reload.
 The optional native TARGET button chooses a party slot, focus, tank or
-lowest-HP ally for the next completed spell only.
+lowest-HP ally until you choose another target.
 The same picker offers enemy, nearest, trash and marked-boss aims. It pauses
 an unfinished rhythm word while open. Keys 1–8 select party slots, T chooses
 a living party tank, and Escape closes the picker and stops. During spelling,
@@ -114,6 +116,14 @@ and MARK BOSS distinguishes boss/add aims. These buttons never cast.
 In ordinary weaving, on party2 physick / on focus physick / on lowest physick /
 on targetOfTarget physick / on nearest ruin + Enter provide the text forms.
 In rhythm mode, type those same phrases on the pulses, including the spaces.
+
+Steam Controller radial spelling: F8 (bind a back grip), L3+R3, or
+/xivspell radial opens the wheels. Map left/right trackpads in the streaming
+client's Steam Input layout to left/right joystick outputs, and right-pad press
+to R3. Left pad selects a letter group; right pad selects a character. L2 or
+right-pad press confirms on the beat. LB enters space, X resets/undoes, Y commits
+an exact shorter name, B closes. R2+A repeats; R2+B continues. Release pads and
+buttons after opening to activate the wheels. See doc/steam-controller.txt.
 
 ctx:cast(actionId, target?) emits one action request. ctx.state is persistent
 for this card during the runtime session. It commits only after a successful

@@ -13,17 +13,15 @@ public sealed partial class Plugin
         eligible &= !gamepad.EnableGamepadNav;
         var composerEligible = eligible && !config.RhythmEnabled;
         if (!composerEligible) composer.Active = false;
-        // Rhythm spelling never leases the pad, but the two playback chords
-        // work in either mode without capturing movement or other hotbar keys.
-        var frame = pad.Read(eligible, composerEligible && composer.Active, composerEligible);
-        if (!eligible) { composer.Active = false; return; }
+        var frame = pad.Read(eligible, radial.Active || composerEligible && composer.Active, eligible);
+        if (!eligible) { composer.Active = false; radial.Close(); return; }
         var playback = pad.TakePlayback();
         if (playback != PadPlaybackCommand.None) { StartPlayback(playback == PadPlaybackCommand.Repeat); return; }
-        if (!composerEligible) return;
         if (pad.TakeOpen()) {
-            composer.Active = !composer.Active; padSequence = 0;
-            if (composer.Active) { InterruptWeave("Controller composing", true); barVisible = true; }
+            ToggleRadial(); padSequence = 0;
         }
+        if (radial.Active) { ReadRadial(frame); return; }
+        if (!composerEligible) return;
         if ((!composer.Active && !RhythmPadOwned) || frame is not { Phase: "Active" } f || f.Sequence == 0) { padSequence = 0; return; }
         if (f.Session != padSession) { padSession = f.Session; padSequence = 0; }
         if (f.Sequence <= padSequence) return;

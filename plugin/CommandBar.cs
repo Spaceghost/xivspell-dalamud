@@ -79,6 +79,7 @@ public sealed partial class Plugin
     }
     private void InterruptWeave(string reason, bool control = false)
     {
+        if (control) radial.Close();
         if (weave.InFlight is { } completed && castResults.TryGetValue(completed, out var result) && result.Accepted)
             weave.Complete(completed, true, result.Message);
         CancelWeaveTicket(weave.Interrupt(reason, control));
@@ -101,6 +102,7 @@ public sealed partial class Plugin
     }
     private void StartPlayback(bool restart = false)
     {
+        radial.Close();
         CloseWeaveTargets(false);
         SuspendRhythm();
         rhythmShown=false;keyboard.AllowRuneDelete=false;
@@ -123,6 +125,7 @@ public sealed partial class Plugin
 
     private void MovementControl()
     {
+        radial.Close();
         weave.EnterControl();
         lastMotionAt = Environment.TickCount64;
         StopFollowing("Movement");
@@ -146,6 +149,7 @@ public sealed partial class Plugin
                 hudController.AddNode(hud);
                 CreateRhythmHud();
                 CreateWeaveTargets();
+                radialHud = new NativeRadialHud(); hudController.AddNode(radialHud);
             }
             var player = objects.LocalPlayer;
             var available = barVisible && player != null && !player.IsDead && !gameGui.GameUiHidden &&
@@ -154,7 +158,7 @@ public sealed partial class Plugin
             hud.IsVisible = available;
             keyboard.Install();
             keyboard.Enabled = available;
-            if (!available) { CloseWeaveTargets(false); SuspendRhythm(); if (rhythmHud!=null) rhythmHud.IsVisible=false; ReadController(false); keyboard.PollBackspace(Environment.TickCount64, false); InterruptWeave("Spellcasting suspended"); lastPlayerPosition = null; return; }
+            if (!available) { CloseWeaveTargets(false); SuspendRhythm(); if (rhythmHud!=null) rhythmHud.IsVisible=false; if (radialHud!=null) radialHud.IsVisible=false; ReadController(false); keyboard.PollBackspace(Environment.TickCount64, false); InterruptWeave("Spellcasting suspended"); lastPlayerPosition = null; return; }
             GetWindowThreadProcessId(GetForegroundWindow(), out var foreground);
             var focused = foreground == (uint)Environment.ProcessId;
             var otherText = editorOpen || RaptureAtkModule.Instance()->IsTextInputActive() || Dalamud.Bindings.ImGui.ImGui.GetIO().WantTextInput || visible;
@@ -216,6 +220,7 @@ public sealed partial class Plugin
             hud.Render(weave, cards, data, armed, Environment.TickCount64 - lastRuntimePoll < 3000, conditions[Dalamud.Game.ClientState.Conditions.ConditionFlag.InCombat], RuneTarget, ReadCooldown, composer, config.RhythmEnabled && rhythmShown);
             RenderRhythmHud();
             RenderWeaveTargets();
+            RenderRadialHud();
         } catch (Exception ex) { log.Error(ex, "Spell weave update"); InterruptWeave("Weave paused"); }
     }
 
@@ -232,6 +237,7 @@ public sealed partial class Plugin
     private void ReadWeaveKeyboard()
     {
         while (keyboard.Events.TryDequeue(out var input)) {
+            if (input.Type == SpellKeyboard.Kind.Radial) { ToggleRadial(); continue; }
             if (WeaveTargetKeyboard(input)) continue;
             if (RhythmKeyboard(input)) continue;
             switch (input.Type) {
@@ -304,7 +310,7 @@ public sealed partial class Plugin
         for (var key = 0; key < 256; key++) {
             var down = (GetAsyncKeyState(key) & 0x8000) != 0;
             var owned = targetKeys.Filter(key, down) || !modified &&
-                ((weave.InputMode || WeaveTargetsOpen) && (key is >= 0x30 and <= 0x5A || key is >= 0xBA and <= 0xE2 || key is 0x20 or 0x08 or 0x09 or 0x0D) || key == 0xBE);
+                ((weave.InputMode || WeaveTargetsOpen) && (key is >= 0x30 and <= 0x5A || key is >= 0xBA and <= 0xE2 || key is 0x20 or 0x08 or 0x09 or 0x0D) || key is 0x77 or 0xBE);
             if (owned && keys.IsVirtualKeyValid(key)) keys[key] = false;
             if (!modified && !owned && down && (key is >= 0x25 and <= 0x28 || (!weave.InputMode && key is 0x57 or 0x41 or 0x53 or 0x44))) MovementControl();
         }

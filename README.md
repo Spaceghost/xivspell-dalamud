@@ -65,9 +65,21 @@ last queued spell; hold it to clear the queue. Visible **UNDO SPELL** and
 Escape pauses, `i` resumes weaving, `>` casts and returns movement control,
 and `.` repeats. Completion alone never casts.
 
-Rhythm input is keyboard-only for now and takes no controller lease. A future
-radial spelling selector, with hover or trigger confirmation, is deferred.
-Normal non-rhythm controller composition remains available with rhythm off.
+Steam Controller trackpads can spell through two native radial wheels. Open them
+with **F8** (bind a back grip to it), **L3+R3**, or `/xivspell radial`. The left pad
+chooses a letter group; the right pad chooses a character. Tap **L2** or press the
+right pad on the beat to enter it. **LB** enters a space, **X** resets the phrase
+or undoes a spell, **Y** commits an exact shorter name, and **B** closes the wheels.
+Lift both thumbs and release buttons when opening; movement returns on close.
+Keyboard spelling continues to work while the wheels are open.
+
+On the streaming client, use Steam Input to map the left and right trackpads to
+the corresponding joystick outputs, and the right-pad press to **R3**. Map a back
+grip to **F8**. These mappings carry through an ordinary streamed gamepad; the
+plugin does not require raw Steam Controller USB access on the host.
+See [Steam Controller setup](doc/steam-controller.txt) for the full mapping and
+checks. The original spell-card controller composer remains available with
+rhythm off through `/xivspell pad`.
 
 For playback in either mode, hold **R2** and tap **X / Cross** to repeat (`.`),
 or **O / Circle** to continue (`>`). The controller wheel does not need to be
@@ -99,7 +111,9 @@ back to yourself when an enemy or no friendly is selected.
 In rhythm mode, type the target first as part of the spell: **`tank physick`**
 heals a party tank; **`party2 physick`** heals party slot 2. You stay in rhythm
 spelling throughout. The target stays attached to that rune through repeat and
-reload; the next plain `physick` uses its normal friendly/self default. Targets
+reload; the next plain `physick` reuses the tank target. A newly typed target
+changes the aim for that spell and following spells. Choose **DEFAULT** in the
+target picker, or clear the weave, to return to each spell's defaults. Targets
 include `tank1`, `tank2`, `healer`, `party1`–`party8`, `focus`, `self`, `lowest`,
 `enemy`, `nearest`, `mob`, `boss` and the other spell-language selectors.
 
@@ -108,7 +122,7 @@ completed spell. The picker works during ordinary and rhythm spelling. Choose a
 named party slot, **FOCUS**, **TANK**, **LOWEST HP**, **NEAREST ENEMY**, **TRASH / ADD**,
 or **BOSS**, then spell normally. With the picker open, keys **1–8** choose party
 slots; **T** chooses a living party tank. **Esc** closes the picker and stops.
-The choice stays on that queued rune; the next word uses its own default.
+The choice stays on that queued rune and is reused by following untargeted spells.
 Choosing a target never casts. The picker pauses an unfinished rhythm word and
 resumes it with a fresh approach after your choice.
 
@@ -126,7 +140,7 @@ Ordinary weaving also accepts `on party2 physick`, `on focus physick`,
 `on boss ruin`, followed by Enter. In rhythm mode, type the same phrases on the
 pulses. A target typed into the spell takes priority over a picker choice.
 Neovim's `:SpellTarget party2` and MCP's `spellbook_target` prepare the same
-one-spell aim. Party/focus/nearest selectors resolve when the rune casts; use a
+retained aim. Party/focus/nearest selectors resolve when the rune casts; use a
 party or focus choice for a mixed queue instead of relying on the current
 selection remaining unchanged.
 

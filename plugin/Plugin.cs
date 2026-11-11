@@ -103,6 +103,7 @@ public sealed partial class Plugin : IDalamudPlugin
         pi.SavePluginConfig(config);
         commands.AddHandler("/xivspell", new CommandInfo((_, args) => {
             if (RhythmCommand(args)) { }
+            else if (args == "radial") ToggleRadial();
             else if (args == "targets") ToggleWeaveTargets();
             else if (args == "off") { SuspendRhythm(); InterruptWeave("Disarmed", true); armed = false; StopFollowing("Disarmed"); }
             else if (args is "autofollow" or "autofollow on" or "autofollow off") {
@@ -202,7 +203,7 @@ public sealed partial class Plugin : IDalamudPlugin
             return new { enabled = config.RhythmEnabled, state = rhythm.State.ToString() };
         }
         if (r.Method == "rhythm_status") return new {
-            enabled = config.RhythmEnabled, state = rhythm.State.ToString(), controller = config.RhythmController,
+            enabled = config.RhythmEnabled, state = rhythm.State.ToString(), controller = radial.Active,
             source = rhythmMusic, bpm = rhythmClock.Bpm, musicFresh = rhythmClock.MusicFresh(RhythmNow),
             rhythm.Score, rhythm.Hits, rhythm.Misses, rhythm.Combo, rhythm.Cursor,
             target = rhythm.Target?.Phrase, queued = rhythmQueued, inputMode = weave.InputMode,
@@ -299,7 +300,7 @@ public sealed partial class Plugin : IDalamudPlugin
         if (r.Method == "snapshot") return new { armed, following, followTarget, followRange, autoFollow = config.AutoFollow, autoFollowAuthorized = autoFollow.Authorized, last, cards, player = objects.LocalPlayer?.Name.TextValue,
             job = objects.LocalPlayer?.ClassJob.RowId, level = objects.LocalPlayer?.Level,
             target = targets.Target?.Name.TextValue, focus = targets.FocusTarget?.Name.TextValue,
-            weave = new { draftRevision = weave.DraftRevision, nextTarget = weave.NextTarget, targetPickerOpen = WeaveTargetsOpen, encounterActor, selectedEncounter = targetBoundary.Target, targetStopped = targetBoundary.Stopped, composer = composer.Active, keyboardInstalled = keyboard.Installed, inputMode = weave.InputMode, paused = weave.Paused, cursor = weave.Cursor, draft = weave.Draft, runes = weave.Runes, inFlight = weave.InFlight, hint = weave.Hint },
+            weave = new { draftRevision = weave.DraftRevision, nextTarget = weave.NextTarget, targetPickerOpen = WeaveTargetsOpen, encounterActor, selectedEncounter = targetBoundary.Target, targetStopped = targetBoundary.Stopped, composer = composer.Active, radial = new { active = radial.Active, ready = radial.Ready, group = radial.Group, letter = radial.Letter, hovered = radial.Hovered }, keyboardInstalled = keyboard.Installed, inputMode = weave.InputMode, paused = weave.Paused, cursor = weave.Cursor, draft = weave.Draft, runes = weave.Runes, inFlight = weave.InFlight, hint = weave.Hint },
             editor = new { open = editorOpen, card = editorCard, dirty = editorDirty, saving = editorSaving, message = editorMessage },
             controllerNavigation = gamepad.EnableGamepadNav,
             controllerLeftStick = new { x = gamepad.LeftStick.X, y = gamepad.LeftStick.Y },

@@ -12,7 +12,7 @@ public sealed partial class Plugin
     private bool rhythmSongChart;
     private const double RhythmApproach = 1.2;
     private bool rhythmQueued, rhythmAvailable;
-    private bool RhythmPadOwned => false; // Controller rhythm is deferred; never lease the pad.
+    private bool RhythmPadOwned => radial.Active;
     private long rhythmPoll;
     private readonly float[] rhythmSpectrum = new float[32];
     private string rhythmMusic = "Tempo guide · start Piano or tap along with game music";
@@ -53,8 +53,8 @@ public sealed partial class Plugin
             config.RhythmBpm = (float)Math.Clamp(bpm, 50, 220); config.RhythmUsePiano = false;
             rhythmClock.SetTempo(config.RhythmBpm, RhythmNow);
         } else if (words[1] is "pad" or "keyboard") {
-            config.RhythmController = false;
-            if (words[1] == "pad") weave.Hint = "Rhythm is keyboard-first · controller spelling is deferred";
+            if (words[1] == "pad") { config.RhythmEnabled = true; if (!radial.Active) ToggleRadial(); }
+            else { radial.Close(); config.RhythmController = false; }
         }
         else if (words[1] == "piano") config.RhythmUsePiano = true;
         else if (words[1] == "offset" && words.Length==3 && float.TryParse(words[2],out var offset) && float.IsFinite(offset))
@@ -130,6 +130,7 @@ public sealed partial class Plugin
     }
     private void SuspendRhythm()
     {
+        if (config.RhythmEnabled) radial.Close();
         if (config.RhythmEnabled && (rhythm.Active || rhythm.Completed)) {
             weave.EnterControl();keyboard.Capture=false;
         }

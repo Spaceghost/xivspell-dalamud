@@ -8,7 +8,7 @@ namespace XivSpell;
 // Native character translation preserves spaces, punctuation and keyboard layouts.
 internal sealed class SpellKeyboard : IDisposable
 {
-    internal enum Kind { Character, Escape, Input, Backspace, TextBackspace, ClearLine, Complete, Commit, Movement }
+    internal enum Kind { Character, Escape, Input, Backspace, TextBackspace, ClearLine, Complete, Commit, Movement, Radial }
     internal readonly record struct Input(Kind Type, char Character = '\0')
     {
         internal long At { get; init; } = Environment.TickCount64;
@@ -65,6 +65,7 @@ internal sealed class SpellKeyboard : IDisposable
                 if (message == 0x100) { // WM_KEYDOWN; ignore operating-system key repeat
                     var key = (int)value;
                     var fresh = ((long)param & (1L << 30)) == 0;
+                    if (key == 0x77) { if (fresh) Events.Enqueue(new(Kind.Radial)); return 0; } // F8 / Steam Input grip
                     if (key == 0x1B) { if (fresh) { Capture = false; Events.Enqueue(new(Kind.Escape)); } }
                     else if (key is >= 0x25 and <= 0x28 || (!Capture && key is 0x57 or 0x41 or 0x53 or 0x44)) {
                         if (fresh) Events.Enqueue(new(Kind.Movement));

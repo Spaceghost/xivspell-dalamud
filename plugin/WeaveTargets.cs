@@ -26,7 +26,7 @@ public sealed partial class Plugin
     {
         if (!WeaveSelectors.Contains(selector)) throw new InvalidOperationException("Choose card, friendly, self, current, focus, a party slot/role or an enemy selector");
         weave.SelectNextTarget(selector == "card" ? null : selector);
-        weave.Hint = selector == "card" ? "Next spell uses its card target" : "Next spell → " + WeavePresentation.TargetLabel(selector) + " · " + TargetDescription(selector);
+        weave.Hint = selector == "card" ? "Target memory cleared · use card defaults" : "Target retained → " + WeavePresentation.TargetLabel(selector) + " · " + TargetDescription(selector);
         CloseWeaveTargets(true);
     }
     private string TargetDescription(string selector)
@@ -180,9 +180,9 @@ internal sealed class NativeWeaveTargets : OverlayNode
         Size=new(width,height);Position=anchor-new Vector2(0,height+16);
         for(var i=0;i<ink.Length;i++) {var inset=i*1.3f;ink[i].Position=new(inset-8,inset-8);ink[i].Size=new(width+16-inset*2,height+16-inset*2);}
         title.Position=new(10,6);title.Size=new(width-20,24);
-        title.String="NEXT SPELL TARGET · "+(selected==null ? "DEFAULT" : WeavePresentation.TargetLabel(selected));
+        title.String="SPELL TARGET · "+(selected==null ? "DEFAULT" : WeavePresentation.TargetLabel(selected));
         detail.Position=new(10,31);detail.Size=new(width-20,22);
-        detail.String=WeavePresentation.Clip(hovered>=0 && hovered<items.Length ? items[hovered].Detail : "1–8 party · T tank · Esc close · Applies to the next spell",(int)((width-20)/6));
+        detail.String=WeavePresentation.Clip(hovered>=0 && hovered<items.Length ? items[hovered].Detail : "1–8 party · T tank · Esc close · Reused until changed",(int)((width-20)/6));
         var cell=(width-38)/4;
         for(var i=0;i<choices.Length;i++) {
             choices[i].Position=new(10+(i%4)*(cell+6),58+(i/4)*28);choices[i].Size=new(cell,24);

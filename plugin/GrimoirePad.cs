@@ -72,7 +72,14 @@ internal sealed unsafe class GrimoirePad : IDisposable
                 var shortcutMask = (shortcut.ConsumeCross ? (uint)GamepadButtonsFlags.Cross : 0)
                     | (shortcut.ConsumeCircle ? (uint)GamepadButtonsFlags.Circle : 0);
                 if (shortcutMask != 0) Filter(ref pad->GamepadInputData, shortcutMask);
-                if (!eligible) { lease.Invalidate(); pendingPlayback = PadPlaybackCommand.None; chordHeld = false; return; }
+                var sample = new GrimoirePadSample(1, (uint)raw.Buttons & ~shortcutMask, raw.LeftStickX / 100f, -raw.LeftStickY / 100f,
+                    raw.RightStickX / 100f, -raw.RightStickY / 100f, raw.PSButton == 0 && raw.MuteButton == 0, Environment.TickCount64);
+                if (!eligible) {
+                    lease.Release("XivHud.Grimoire", 1, Now);
+                    var drain = lease.Poll(sample, true, Now);
+                    if (drain.Buttons != 0) Filter(ref pad->GamepadInputData, drain.Buttons);
+                    pendingPlayback = PadPlaybackCommand.None; chordHeld = false; return;
+                }
                 if (shortcut.Command != PadPlaybackCommand.None) {
                     pendingPlayback = shortcut.Command; playbackAt = Now;
                     Interlocked.Exchange(ref opened, 0);
@@ -81,8 +88,6 @@ internal sealed unsafe class GrimoirePad : IDisposable
                 if (composerEnabled && shortcutMask == 0 && chord && !chordHeld) Interlocked.Exchange(ref opened, 1);
                 chordHeld = chord;
                 if (composerEnabled && chord) Filter(ref pad->GamepadInputData, (uint)(GamepadButtonsFlags.L3 | GamepadButtonsFlags.R3));
-                var sample = new GrimoirePadSample(1, (uint)raw.Buttons & ~shortcutMask, raw.LeftStickX / 100f, -raw.LeftStickY / 100f,
-                    raw.RightStickX / 100f, -raw.RightStickY / 100f, raw.PSButton == 0 && raw.MuteButton == 0, Environment.TickCount64);
                 var filter = lease.Poll(sample, true, Now);
                 if (filter.All) {
                     ref var input = ref pad->GamepadInputData;

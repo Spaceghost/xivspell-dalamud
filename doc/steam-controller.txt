@@ -1,0 +1,65 @@
+STEAM CONTROLLER / STREAMED SPELLSTRINGS
+
+This layout uses the latest Steam Controller on the streaming client. The
+trackpads send normal gamepad axes to the host, where XivSpell draws the wheels.
+Configure the streaming app's Steam Input layout, rather than the host launcher.
+
+CLIENT SETUP
+
+For a desktop streaming app supported by Steam Input, add that app to the
+client's Steam library and launch it through Steam. Start from a normal Gamepad
+layout and make these changes:
+
+  Left trackpad       Joystick; output Left Joystick
+  Right trackpad      Joystick; output Right Joystick
+  Right-pad press     Right Stick Click (R3)
+  Left-pad press      Unassigned
+  Back grip (L4)      Keyboard F8
+  Optional back grip  Keyboard Backspace
+  Face buttons        Normal A/B/X/Y gamepad buttons
+  Triggers/bumpers    Normal LT/RT/LB/RB gamepad controls
+
+Use positional joystick output, with a fixed center, linear response and no
+trackball momentum. Keep normal stick mappings. Outside the spelling wheels,
+the pads can also serve as movement and camera controls. No Steam action-layer
+toggle is needed, so closing the in-game wheel cannot leave a layer out of sync.
+
+Valve documents joystick output for trackpads here:
+https://partner.steamgames.com/doc/features/steam_controller/input_source_modes
+
+SPELLING
+
+Press the mapped grip/F8, both stick clicks (L3+R3), or use /xivspell radial.
+For rhythm spelling specifically, /xivspell rhythm pad enables rhythm and opens
+the wheels. Lift both thumbs and release buttons once after opening.
+
+  Left pad            Pick ABCD, EFGH, IJKL, MNOP, QRST, UVWX, YZ/space/- or digits
+  Right pad           Point at a character in the selected group
+  L2 / right-pad press Enter that character on the rhythm pulse
+  LB                  Enter a space on the pulse
+  X                   Restart the unfinished phrase; otherwise undo the last spell
+  Y                   Finish an exact shorter spell name
+  B / grip / F8       Close and return to movement
+  R2 + A              Repeat the weave (PlayStation R2 + Cross)
+  R2 + B              Continue the weave (PlayStation R2 + Circle)
+
+Hovering never types. Holding a confirmation does not repeat. R2 by itself does
+not enter a letter, so preparing a playback chord cannot add an accidental rune.
+The letter and rhythm timestamp are captured together at button-down.
+
+Spell "tank physick" including its space. Then spell "physick"; it keeps the
+tank target. "self physick" changes the target for that and following spells.
+DEFAULT in the target picker or clearing the weave resets target memory. Undoing
+a spell that changed the target restores the preceding aim.
+
+CHECK THE ROUTE
+
+Open the wheels, release the controller, and slide each pad. The left selection
+and right character highlight should follow the pads. If the cursor moves
+instead, change that pad from Mouse to Joystick in the client's Steam Input
+layout. If the wheels stay at "Lift both thumbs", release both pads, sticks,
+triggers and face buttons; confirm that the streaming app receives a gamepad.
+
+The game-side wheels and input policy can be tested independently. The physical
+Steam Controller mapping still needs confirmation on the streaming client;
+generic controller or keyboard tests do not establish that the pads are routed.

@@ -15,7 +15,8 @@ public readonly record struct GrimoirePadFilter(bool All, uint Buttons);
 /// <summary>Versioned IPC value. Buttons use the native directional/face/shoulder
 /// mask; sticks are normalized to [-1,1], with negative Y pointing up.</summary>
 public readonly record struct GrimoirePadFrame(int Version, string Phase, ulong Sequence,
-    uint Held, uint Pressed, uint Released, float LeftX, float LeftY, float RightX, float RightY, ulong Session = 1, long InputTime = 0);
+    uint Held, uint Pressed, uint Released, float LeftX, float LeftY, float RightX, float RightY, ulong Session = 1, long InputTime = 0,
+    GrimoirePadSample? PressSample = null);
 
 /// <summary>One focused XivHud feature owns the pad only through a fresh UI lease.
 /// Call under the broker's lock. No game globals, input injection or native pointers.</summary>
@@ -30,6 +31,7 @@ public sealed class GrimoirePadLease : IDisposable
     private GrimoirePadSample sample;
     private uint pressed, released, drain;
     private long inputTime;
+    private GrimoirePadSample? pressSample;
     private int neutralPolls;
     private bool disposed;
     private readonly ulong session;
@@ -59,9 +61,10 @@ public sealed class GrimoirePadLease : IDisposable
         if (!Observe(now)) return false;
         Expire(now);
         if (owner != name || generation != focusGeneration) return false;
+        if (phase == Phase.Draining) return true; // Repeated focus updates cannot extend the drain deadline.
         // Release analog movement and unrelated/new buttons immediately. Only
         // buttons held by this owner are quarantined until up, at most100ms.
-        drain = sample.Held; pressed = released = 0;
+        drain = sample.Held; pressed = released = 0; pressSample = null;
         phase = Phase.Draining; deadline = now + MaximumLeaseSeconds;
         if (drain == 0) Clear();
         return true;
@@ -95,7 +98,7 @@ public sealed class GrimoirePadLease : IDisposable
             if (neutralPolls >= 2) phase = Phase.Active;
             return new(true, 0xFFFF);
         }
-        if ((next.Held & ~sample.Held) != 0 && pressed == 0) inputTime = next.InputTime;
+        if ((next.Held & ~sample.Held) != 0 && pressed == 0) { inputTime = next.InputTime; pressSample = next; }
         pressed |= next.Held & ~sample.Held;
         released |= sample.Held & ~next.Held;
         sample = next;
@@ -111,8 +114,8 @@ public sealed class GrimoirePadLease : IDisposable
             return new(1, phase.ToString(), sequence, 0, 0, 0, 0, 0, 0, 0, session);
         if (!double.IsFinite(lastPoll) || now - lastPoll > MaximumLeaseSeconds) { Clear(); return null; }
         var frame = new GrimoirePadFrame(1, "Active", sequence, sample.Held, pressed, released,
-            sample.LeftX, sample.LeftY, sample.RightX, sample.RightY, session, inputTime);
-        pressed = released = 0; inputTime = 0;
+            sample.LeftX, sample.LeftY, sample.RightX, sample.RightY, session, inputTime, pressSample);
+        pressed = released = 0; inputTime = 0; pressSample = null;
         return frame;
     }
 
@@ -134,6 +137,6 @@ public sealed class GrimoirePadLease : IDisposable
     private void Clear()
     {
         phase = Phase.None; owner = null; generation = source = 0;
-        sample = default; pressed = released = drain = 0; inputTime = 0; neutralPolls = 0; lastPoll = double.NaN;
+        sample = default; pressed = released = drain = 0; inputTime = 0; pressSample = null; neutralPolls = 0; lastPoll = double.NaN;
     }
 }
